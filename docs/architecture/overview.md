@@ -2,7 +2,7 @@
 
 Six application components, one Kafka bus and three storage systems. Services talk through events. Two direct calls are deliberate: the dashboard calls the Spring backend over REST and SSE, and the inference service reads the MLflow registry to load the current model.
 
-Ports, environment variables and bucket layout are in [runtime-conventions.md](runtime-conventions.md). Event schemas are in [`libs/contracts`](../../libs/contracts/README.md).
+Ports, environment variables and bucket layout are in [runtime-conventions.md](runtime-conventions.md). Event schemas are in [`libs/contracts`](../../libs/contracts/README.md). The retrain Job launched by the agent follows [retrain-contract.md](retrain-contract.md).
 
 ## Components
 
