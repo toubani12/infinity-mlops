@@ -1,0 +1,91 @@
+# The backend API, the dashboard and Grafana are reached from browsers (NodePort or
+# port-forward), so they accept any source. Metrics ports only accept Prometheus.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-spring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: backend-spring
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-next
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: frontend-next
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 9090
+      from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-fastapi-ml-scrape
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: fastapi-ml
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 8000
+      from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-agents-langgraph-scrape
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: agents-langgraph
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 8100
+      from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
