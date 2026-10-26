@@ -58,7 +58,7 @@ Reset after changing `infra/postgres/init/` (the script only runs on an empty vo
 
 ## Troubleshooting
 
-- Port already in use: another local PostgreSQL or Kafka is running. Stop it or change the host port in the Compose file.
+- Port already in use: another local PostgreSQL, MLflow or dev server is running, or macOS AirPlay holds port 5000. Copy `infra/env/.env.example` to `infra/env/.env` and set the matching `*_HOST_PORT` (for example `MLFLOW_HOST_PORT=5050`), then update the host-side URLs in the same file (`MLFLOW_TRACKING_URI`, `DATABASE_URL`, ...). Kafka keeps 9092 because its advertised listener is fixed.
 - `mlflow` stays unhealthy: check `make logs s=mlflow`; the first start runs the database migrations and can take up to a minute.
 - Kafka refuses to start after a version bump: `make reset` to drop the old log directory.
 - MinIO no longer publishes community images; the Compose file pins the last published `minio/minio` and `minio/mc` releases.
