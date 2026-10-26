@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     kafka_batch_size: int = Field(default=64, ge=1, le=1000)
     kafka_max_wait_ms: int = Field(default=50, ge=0)
 
+    model_events_enabled: bool = True
+    model_events_topic: str = "model.promoted"
+    model_events_group_prefix: str = "fastapi-ml-reload"
+    model_reload_attempts: int = Field(default=3, ge=1)
+
 
 @lru_cache
 def get_settings() -> Settings:

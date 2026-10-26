@@ -46,8 +46,9 @@ class StaticLoader:
 
 
 @pytest.fixture(autouse=True)
-def no_default_prediction_log(monkeypatch) -> None:
+def no_default_side_channels(monkeypatch) -> None:
     monkeypatch.setenv("PREDICTION_LOG_ENABLED", "false")
+    monkeypatch.setenv("MODEL_EVENTS_ENABLED", "false")
 
 
 @pytest.fixture
