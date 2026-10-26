@@ -13,8 +13,9 @@ reference sample of the served model, saves an Evidently report and publishes `d
 3. Runs Evidently `DataDriftPreset` on `v1`..`v28` and `amount` (current window sampled to
    `MAX_REPORT_ROWS`). A feature is drifted when its per-column drift test fails; Evidently picks
    the test from the sample size (K-S p-value up to 1000 rows, normed Wasserstein above).
-4. Data incident signals: `missing_features` (column absent, more than half null, or stuck on
-   a single value while the reference varies) and `out_of_range_share` (rows with a feature
+4. Data incident signals: `missing_features` (column absent, null on more than
+   `MISSING_SHARE_THRESHOLD` of the rows, or one value filling more than that share although it
+   is rare in the reference, the signature of a default fill such as `0.0`) and `out_of_range_share` (rows with a feature
    outside the reference range widened by `RANGE_MARGIN` of its span, or a negative amount).
    Missing features count as drifted in `drift_share`.
 5. PR-AUC and recall at 90 % precision on the rows that carry a `label` (at least
@@ -41,6 +42,7 @@ from the snapshot tests). It does not import with pandas 3, hence `pandas<3`.
 | `DRIFT_SHARE_THRESHOLD` | `0.3` |
 | `PR_AUC_DROP_THRESHOLD` | `0.05` |
 | `OUT_OF_RANGE_THRESHOLD` / `RANGE_MARGIN` | `0.05` / `0.1` |
+| `MISSING_SHARE_THRESHOLD` | `0.1` |
 | `MIN_LABELED_ROWS` / `MIN_LABELED_FRAUDS` | `200` / `5` |
 
 Any URI may be a local path instead of `s3://`, which is how the tests run.
