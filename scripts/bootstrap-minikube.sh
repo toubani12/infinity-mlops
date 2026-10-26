@@ -4,6 +4,7 @@
 # Environment overrides:
 #   MINIKUBE_PROFILE (infinity)  MINIKUBE_MEMORY (8192)  MINIKUBE_CPUS (4)  MINIKUBE_DISK (30g)
 #   NEXT_PUBLIC_API_BASE_URL (http://localhost:8080)  SKIP_BUILD (0)  ROLLOUT_TIMEOUT (300s)
+#   MINIKUBE_CNI (empty: minikube's default, which ignores NetworkPolicy; calico enforces them)
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -17,6 +18,7 @@ cpus=${MINIKUBE_CPUS:-4}
 disk=${MINIKUBE_DISK:-30g}
 api_base_url=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
 rollout_timeout=${ROLLOUT_TIMEOUT:-300s}
+cni=${MINIKUBE_CNI:-}
 
 # name:build context relative to the repository root. Plain arrays only: macOS ships bash 3.2.
 images=(
@@ -41,9 +43,12 @@ require() {
 start_cluster() {
   if minikube -p "$profile" status > /dev/null 2>&1; then
     log "minikube profile $profile is already running"
+    if [ -n "$cni" ]; then
+      echo "MINIKUBE_CNI only applies when the profile is created: minikube -p $profile delete first to change it"
+    fi
   else
-    log "starting minikube profile $profile (${memory} MB, ${cpus} CPUs)"
-    minikube start -p "$profile" --memory "$memory" --cpus "$cpus" --disk-size "$disk"
+    log "starting minikube profile $profile (${memory} MB, ${cpus} CPUs${cni:+, CNI $cni})"
+    minikube start -p "$profile" --memory "$memory" --cpus "$cpus" --disk-size "$disk" ${cni:+--cni="$cni"}
   fi
   minikube -p "$profile" addons enable metrics-server
   kubectl config use-context "$profile" > /dev/null
