@@ -62,21 +62,28 @@ def load_window(storage: Storage, predictions_uri: str, window: Window) -> pd.Da
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
-def missing_features(current: pd.DataFrame, reference: pd.DataFrame) -> list[str]:
-    """A feature is missing when absent, mostly null, or stuck on one value it never had in the
-    reference; upstream outages usually show up as nulls or a default fill."""
+def missing_features(
+    current: pd.DataFrame, reference: pd.DataFrame, max_share: float = 0.1
+) -> list[str]:
+    """A feature is missing when absent, null on more than `max_share` of the rows, or when a
+    single value fills more than `max_share` of the rows although it is rare in the reference:
+    upstream outages show up as nulls or as a default fill such as 0.0."""
     missing = []
     for feature in FEATURES:
         if feature not in current.columns:
             missing.append(feature)
             continue
         values = current[feature]
-        if values.isna().mean() > 0.5:
+        if values.isna().mean() > max_share:
             missing.append(feature)
-        elif len(values) > 1 and values.nunique(dropna=True) == 1:
-            if reference[feature].nunique(dropna=True) > 1:
+        elif values.notna().any() and _top_share(values) > max_share:
+            if _top_share(reference[feature]) < max_share / 2:
                 missing.append(feature)
     return missing
+
+
+def _top_share(values: pd.Series) -> float:
+    return float(values.value_counts(normalize=True, dropna=True).iloc[0])
 
 
 def out_of_range_share(current: pd.DataFrame, reference: pd.DataFrame, margin: float) -> float:
@@ -151,7 +158,7 @@ def analyze(
     max_rows: int = 50_000,
 ) -> DriftResult:
     report_id = str(uuid.uuid4())
-    missing = missing_features(current, reference)
+    missing = missing_features(current, reference, thresholds.missing_share)
     snapshot, columns = evidently_drift(
         current.drop(columns=missing, errors="ignore"), reference, thresholds.drift_share, max_rows
     )
