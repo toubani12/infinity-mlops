@@ -13,6 +13,8 @@ Spring Boot 3.5, Java 21, PostgreSQL with Flyway, Actuator with Prometheus metri
 | GET | `/api/transactions?page&size&fraudOnly` | newest first, `size` ≤ 200 |
 | GET | `/api/alerts?page&size&status` | `status` in `OPEN`, `ACKNOWLEDGED`, `CLOSED` |
 | PATCH | `/api/alerts/{id}` | body `{ "status": "ACKNOWLEDGED" }` |
+| GET | `/api/drift/reports?page&size` and `/api/drift/reports/{id}` | from `drift.detected`, newest first |
+| GET | `/api/models/versions?page&size` | champion alias moves from `model.promoted`, newest first |
 | GET | `/actuator/health`, `/actuator/prometheus` | |
 
 REST bodies use camelCase. Kafka payloads follow `libs/contracts` (snake_case). Lists return `{ content, page, size, totalElements, totalPages }`. Errors are RFC 9457 problem details (`application/problem+json`); validation errors add an `errors` map keyed by field.
@@ -31,7 +33,9 @@ Accepted transactions are published to `transaction.raw`, key `transaction_id`, 
 
 The `transactions` table is its own outbox. `POST /api/transactions` only commits the row; `TransactionRawRelay` runs every 200 ms, takes up to 500 rows with `published_at IS NULL` in arrival order, sends them and sets `published_at` for the ones the broker acknowledged. A row whose send fails or times out stays pending and is retried on the next run, so a Kafka outage never loses a transaction and never fails the API call. Delivery is at least once (a crash after the ack and before the commit republishes the row); consumers dedupe on `transaction_id`. Metrics: `infinity_outbox_published_total` and `infinity_outbox_failed_total`.
 
-The service consumes `transaction.scored` in group `backend-spring`. Each record updates the transaction's score fields and opens an alert when `fraud_score >= ALERT_THRESHOLD`. Replays are harmless: the score is overwritten with the same values and `alerts.transaction_id` is unique, checked before insert. Scores for unknown transactions are logged and counted (`infinity_scores_unknown_transaction_total`), so transactions must enter through `POST /api/transactions` to appear in the dashboard. Unreadable or incomplete records are skipped at once; other failures are retried three times one second apart, then logged and skipped.
+The service also consumes `drift.detected` into `drift_report` and `model.promoted` into `model_version_event`, both idempotent on the event id (`report_id`, `event_id`).
+
+It consumes `transaction.scored` in group `backend-spring`. Each record updates the transaction's score fields and opens an alert when `fraud_score >= ALERT_THRESHOLD`. Replays are harmless: the score is overwritten with the same values and `alerts.transaction_id` is unique, checked before insert. Scores for unknown transactions are logged and counted (`infinity_scores_unknown_transaction_total`), so transactions must enter through `POST /api/transactions` to appear in the dashboard. Unreadable or incomplete records are skipped at once; other failures are retried three times one second apart, then logged and skipped.
 
 ## Configuration
 
