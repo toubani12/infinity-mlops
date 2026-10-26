@@ -6,8 +6,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.infinity.core.config.ClockConfig;
+import io.infinity.core.config.ConflictException;
 import io.infinity.core.config.NotFoundException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
@@ -15,10 +20,13 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -30,6 +38,25 @@ class AgentRunServiceTest {
     @TestConfiguration
     @EnableConfigurationProperties(AgentProperties.class)
     static class Fakes {
+
+        @Bean
+        RecordingSender recordingSender() {
+            return new RecordingSender();
+        }
+    }
+
+    static class RecordingSender implements AgentCommandSender {
+
+        final List<AgentCommand> sent = new ArrayList<>();
+        final AtomicBoolean brokerDown = new AtomicBoolean();
+
+        @Override
+        public void send(AgentCommand command) {
+            if (brokerDown.get()) {
+                throw new CommandNotSentException(new IllegalStateException("broker down"));
+            }
+            sent.add(command);
+        }
     }
 
     @Autowired
@@ -39,7 +66,16 @@ class AgentRunServiceTest {
     private AgentRunRepository runs;
 
     @Autowired
+    private RecordingSender sender;
+
+    @Autowired
     private ApplicationEvents applicationEvents;
+
+    @BeforeEach
+    void resetSender() {
+        sender.sent.clear();
+        sender.brokerDown.set(false);
+    }
 
     @Test
     void foldsStepsIntoAWaitingRunWithMetricsAndTimeline() {
@@ -87,12 +123,16 @@ class AgentRunServiceTest {
         for (AgentStepEvent event : untilApproval(runId)) {
             service.record(event);
         }
+        service.decide(runId, AgentCommand.Action.APPROVE, "badr", null);
+        assertThat(runs.findById(runId).orElseThrow().getPendingCommand().actor()).isEqualTo("badr");
+
         service.record(step(runId, 320, AgentStep.APPROVED, "promote", "{\"actor\":\"badr\",\"reason\":null}"));
         service.record(step(runId, 321, AgentStep.PROMOTED, "promote", "{\"version\":\"4\",\"previous_version\":\"3\"}"));
         service.record(step(runId, 321, AgentStep.COMPLETED, "promote", "{}"));
 
         AgentRun run = runs.findById(runId).orElseThrow();
         assertThat(run.getStatus()).isEqualTo(AgentRunStatus.PROMOTED);
+        assertThat(run.getPendingCommand()).isNull();
         assertThat(run.getDecidedBy()).isEqualTo("badr");
         assertThat(run.getPromotedVersion()).isEqualTo("4");
         assertThat(service.list(AgentRunStatus.PROMOTED, 0, 10).getContent()).extracting(AgentRun::getId)
@@ -102,5 +142,55 @@ class AgentRunServiceTest {
     @Test
     void failsOnUnknownRun() {
         assertThatThrownBy(() -> service.detail(UUID.randomUUID())).isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void sendsOneCommandPerWaitingRun() {
+        UUID runId = UUID.randomUUID();
+        for (AgentStepEvent event : untilApproval(runId)) {
+            service.record(event);
+        }
+
+        AgentRun run = service.decide(runId, AgentCommand.Action.REJECT, "badr", "latency budget too tight");
+
+        assertThat(run.getStatus()).isEqualTo(AgentRunStatus.AWAITING_APPROVAL);
+        assertThat(sender.sent).singleElement().satisfies(command -> {
+            assertThat(command.runId()).isEqualTo(runId);
+            assertThat(command.action()).isEqualTo(AgentCommand.Action.REJECT);
+            assertThat(command.reason()).isEqualTo("latency budget too tight");
+        });
+        assertThatThrownBy(() -> service.decide(runId, AgentCommand.Action.APPROVE, "other", null))
+                .isInstanceOf(ConflictException.class).hasMessageContaining("already sent");
+        assertThat(sender.sent).hasSize(1);
+    }
+
+    @Test
+    void refusesDecisionsOnRunsThatDoNotWait() {
+        UUID runId = UUID.randomUUID();
+        service.record(step(runId, 0, AgentStep.RECEIVED, null, "{}"));
+
+        assertThatThrownBy(() -> service.decide(runId, AgentCommand.Action.APPROVE, "badr", null))
+                .isInstanceOf(ConflictException.class).hasMessageContaining("RUNNING");
+        assertThatThrownBy(() -> service.decide(UUID.randomUUID(), AgentCommand.Action.APPROVE, "badr", null))
+                .isInstanceOf(NotFoundException.class);
+        assertThat(sender.sent).isEmpty();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void leavesTheRunUntouchedWhenTheCommandCannotBeSent() {
+        UUID runId = UUID.randomUUID();
+        for (AgentStepEvent event : untilApproval(runId)) {
+            service.record(event);
+        }
+        sender.brokerDown.set(true);
+
+        assertThatThrownBy(() -> service.decide(runId, AgentCommand.Action.APPROVE, "badr", null))
+                .isInstanceOf(CommandNotSentException.class);
+
+        assertThat(runs.findById(runId).orElseThrow().getPendingCommand()).isNull();
+        sender.brokerDown.set(false);
+        service.decide(runId, AgentCommand.Action.APPROVE, "badr", null);
+        assertThat(sender.sent).hasSize(1);
     }
 }

@@ -79,6 +79,9 @@ public class AgentRun {
     @Column(name = "gate_reasons")
     private String[] gateReasons;
 
+    @Embedded
+    private PendingCommand pendingCommand;
+
     @Column(name = "decided_by")
     private String decidedBy;
 
@@ -123,6 +126,7 @@ public class AgentRun {
             case APPROVED, REJECTED -> {
                 decidedBy = ModelMetrics.text(payload, "actor");
                 decisionReason = ModelMetrics.text(payload, "reason");
+                pendingCommand = null;
             }
             case PROMOTED -> promotedVersion = ModelMetrics.text(payload, "version");
             default -> {
@@ -130,6 +134,10 @@ public class AgentRun {
         }
         eventCount++;
         return eventCount;
+    }
+
+    void commandSent(PendingCommand command) {
+        pendingCommand = command;
     }
 
     private void recordMetrics(JsonNode payload) {
@@ -210,6 +218,10 @@ public class AgentRun {
 
     public List<String> getGateReasons() {
         return gateReasons == null ? List.of() : List.of(gateReasons);
+    }
+
+    public PendingCommand getPendingCommand() {
+        return pendingCommand;
     }
 
     public String getDecidedBy() {

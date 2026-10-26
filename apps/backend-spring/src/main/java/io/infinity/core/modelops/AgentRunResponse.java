@@ -14,6 +14,7 @@ public record AgentRunResponse(
         String lastMessage,
         String championVersion,
         String challengerVersion,
+        PendingCommand pendingCommand,
         String decidedBy,
         String decisionReason,
         String promotedVersion) {
@@ -23,6 +24,6 @@ public record AgentRunResponse(
                 run.getUpdatedAt(), run.getLastStep(), run.getLastDecision(), run.getLastMessage(),
                 run.getChampion() == null ? null : run.getChampion().version(),
                 run.getChallenger() == null ? null : run.getChallenger().version(),
-                run.getDecidedBy(), run.getDecisionReason(), run.getPromotedVersion());
+                run.getPendingCommand(), run.getDecidedBy(), run.getDecisionReason(), run.getPromotedVersion());
     }
 }
