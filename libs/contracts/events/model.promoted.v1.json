@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://infinity-mlops.io/contracts/events/model.promoted.v1.json",
+  "title": "model.promoted.v1",
+  "description": "Alias move in the MLflow registry, published by agents-langgraph. Key: model_name.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "timestamp",
+    "model_name",
+    "version",
+    "alias",
+    "previous_version"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "model_name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "alias": {
+      "type": "string",
+      "enum": [
+        "champion"
+      ]
+    },
+    "previous_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "promotion",
+        "rollback"
+      ]
+    }
+  }
+}
