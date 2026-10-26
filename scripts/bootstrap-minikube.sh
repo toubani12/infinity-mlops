@@ -94,7 +94,7 @@ wait_for_rollouts() {
   done
   kubectl -n "$namespace" wait --for=condition=complete job/kafka-topics job/minio-buckets --timeout "$rollout_timeout"
 
-  for name in ${built[@]+"${built[@]}"}; do
+  for name in ${built[@]+"${built[@]}"} prometheus grafana; do
     if kubectl -n "$namespace" get "deployment/$name" > /dev/null 2>&1; then
       kubectl -n "$namespace" rollout status "deployment/$name" --timeout "$rollout_timeout"
     fi
@@ -112,10 +112,12 @@ Deployed to namespace $namespace.
   kubectl -n $namespace port-forward svc/backend-spring 8080:8080
   kubectl -n $namespace port-forward svc/frontend-next 3000:3000
   kubectl -n $namespace port-forward svc/mlflow 5000:5000
+  kubectl -n $namespace port-forward svc/grafana 3001:3000
 
 NodePorts (Linux, or macOS with "minikube -p $profile service --url"):
   backend-spring  http://$ip:30080
   frontend-next   http://$ip:30300
+  grafana         http://$ip:30301
 EOF
 }
 

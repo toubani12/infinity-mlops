@@ -1,0 +1,40 @@
+# One target per pod, found through the EndpointSlices of each Service: scraping the Service
+# address would hit a random replica and mix the counters of fastapi-ml's replicas.
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: fastapi-ml
+    kubernetes_sd_configs: &infinity-endpoints
+      - role: endpointslice
+        namespaces:
+          names: [infinity]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpointslice_port_name]
+        regex: fastapi-ml;http
+        action: keep
+      - &pod-instance
+        source_labels: [__meta_kubernetes_pod_name]
+        target_label: instance
+
+  - job_name: agents-langgraph
+    kubernetes_sd_configs: *infinity-endpoints
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpointslice_port_name]
+        regex: agents-langgraph;http
+        action: keep
+      - *pod-instance
+
+  - job_name: backend-spring
+    metrics_path: /actuator/prometheus
+    kubernetes_sd_configs: *infinity-endpoints
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpointslice_port_name]
+        regex: backend-spring;http
+        action: keep
+      - *pod-instance
