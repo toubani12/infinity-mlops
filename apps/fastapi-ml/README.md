@@ -6,15 +6,41 @@ It implements `libs/contracts/openapi/inference.v1.yaml`.
 | Method | Path | Behaviour |
 |---|---|---|
 | POST | `/predict` | score one transaction; 422 when a V feature is missing or unknown, 503 without a model |
-| GET | `/model` | name, version, alias, load time and threshold of the served model |
+| GET | `/model` | name, version, alias, load time and threshold of the served model, `last_reload_error` when the last reload failed |
 | POST | `/model/reload` | load the version behind the alias and swap it in; 503 keeps the previous model |
 | GET | `/health` | `ok` with a model, `degraded` without |
-| GET | `/metrics` | Prometheus: `http_request_duration_seconds`, `predictions_total`, `fraud_score`, `model_reloads_total`, `kafka_messages_total`, `kafka_batch_size`, `prediction_log_rows_total` |
+| GET | `/metrics` | Prometheus: `http_request_duration_seconds`, `predictions_total`, `fraud_score`, `model_reloads_total`, `served_model_info{model_name,version}`, `model_events_total`, `kafka_messages_total`, `kafka_batch_size`, `prediction_log_rows_total` |
 
 The model is loaded at startup (FastAPI lifespan). If the registry is unreachable the service
 still starts, answers 503 and retries every `MODEL_RETRY_SECONDS` until a load succeeds. A reload loads the new version next to the
 current one and swaps the reference only on success, so `/predict` keeps serving during and after
 a failed reload. `is_fraud` is `fraud_score >= FRAUD_THRESHOLD`.
+
+## Hot reload on `model.promoted`
+
+Every replica subscribes to `model.promoted` (`MODEL_EVENTS_ENABLED`, on by default) and reloads
+`@champion` when an event names its `MODEL_NAME` and alias with a version other than the one it
+serves; a promotion and a rollback (`reason: rollback`) are handled the same way. The reload
+resolves the alias at load time, so a stale event still ends on what the alias points to.
+
+The consumer group is `fastapi-ml-reload-<hostname>`, one per pod. Kafka gives each message of a
+group to a single member, so with the `fastapi-ml` group, or any group shared by the replicas,
+only one replica would reload and the others would keep the old model. A group per pod gives
+every replica every event, and the pod name keeps the group stable across container restarts,
+so a restarted container resumes at its committed offset. A new pod starts at the latest offset
+(`auto_offset_reset=latest`): it loads `@champion` at startup and only needs later events.
+Groups of deleted pods are cleaned up by the broker once their offsets expire
+(`offsets.retention.minutes`, 7 days by default).
+
+A reload loads the new model next to the current one and swaps the reference in one assignment;
+`score` reads that reference once per call, so requests in flight finish on the model they
+started with and no request fails during a swap (`tests/test_hot_reload.py` hammers `/predict`
+with 16 concurrent clients through successful and failed reloads). A failed reload is retried
+`MODEL_RELOAD_ATTEMPTS` times, `MODEL_RETRY_SECONDS` apart; after that the previous model keeps
+serving, the error is logged and shown in `/model` as `last_reload_error`, and the next event or
+`POST /model/reload` tries again. The served version is the `version` field of `/model`, the
+`model_version` label of `predictions_total` and the `served_model_info` gauge. Kafka being down
+does not block startup: the subscription reconnects every `MODEL_RETRY_SECONDS`.
 
 ## Kafka scoring
 
@@ -59,6 +85,9 @@ filesystem implementation.
 | `KAFKA_INPUT_TOPIC` / `KAFKA_OUTPUT_TOPIC` | `transaction.raw` / `transaction.scored` |
 | `KAFKA_GROUP_ID` | `fastapi-ml` |
 | `KAFKA_BATCH_SIZE` / `KAFKA_MAX_WAIT_MS` | `64` / `50` |
+| `MODEL_EVENTS_ENABLED` | `true` |
+| `MODEL_EVENTS_TOPIC` / `MODEL_EVENTS_GROUP_PREFIX` | `model.promoted` / `fastapi-ml-reload` |
+| `MODEL_RELOAD_ATTEMPTS` | `3` |
 | `MLFLOW_HTTP_REQUEST_MAX_RETRIES` / `MLFLOW_HTTP_REQUEST_TIMEOUT` | `2` / `10` in the image, so a down registry does not block startup for minutes |
 
 Model artifacts are downloaded through the MLflow server (`--serve-artifacts`); set
