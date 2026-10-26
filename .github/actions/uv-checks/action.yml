@@ -1,0 +1,30 @@
+name: uv checks
+description: Sync a uv project from its lockfile, run ruff and pytest
+inputs:
+  path:
+    description: Folder that holds pyproject.toml and uv.lock
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v6
+      with:
+        python-version: "3.12"
+        enable-cache: true
+        cache-dependency-glob: ${{ inputs.path }}/uv.lock
+    - name: uv sync --frozen
+      shell: bash
+      working-directory: ${{ inputs.path }}
+      run: uv sync --frozen
+    - name: ruff check
+      shell: bash
+      working-directory: ${{ inputs.path }}
+      run: uv run ruff check .
+    - name: ruff format --check
+      shell: bash
+      working-directory: ${{ inputs.path }}
+      run: uv run ruff format --check .
+    - name: pytest
+      shell: bash
+      working-directory: ${{ inputs.path }}
+      run: uv run pytest -q
