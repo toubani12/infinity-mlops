@@ -31,6 +31,8 @@ Accepted transactions are published to `transaction.raw`, key `transaction_id`, 
 
 The `transactions` table is its own outbox. `POST /api/transactions` only commits the row; `TransactionRawRelay` runs every 200 ms, takes up to 500 rows with `published_at IS NULL` in arrival order, sends them and sets `published_at` for the ones the broker acknowledged. A row whose send fails or times out stays pending and is retried on the next run, so a Kafka outage never loses a transaction and never fails the API call. Delivery is at least once (a crash after the ack and before the commit republishes the row); consumers dedupe on `transaction_id`. Metrics: `infinity_outbox_published_total` and `infinity_outbox_failed_total`.
 
+The service consumes `transaction.scored` in group `backend-spring`. Each record updates the transaction's score fields and opens an alert when `fraud_score >= ALERT_THRESHOLD`. Replays are harmless: the score is overwritten with the same values and `alerts.transaction_id` is unique, checked before insert. Scores for unknown transactions are logged and counted (`infinity_scores_unknown_transaction_total`), so transactions must enter through `POST /api/transactions` to appear in the dashboard. Unreadable or incomplete records are skipped at once; other failures are retried three times one second apart, then logged and skipped.
+
 ## Configuration
 
 | Variable | Default |
@@ -38,6 +40,7 @@ The `transactions` table is its own outbox. `POST /api/transactions` only commit
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/infinity` |
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `infinity` / `infinity` |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` |
+| `ALERT_THRESHOLD` | `0.5` |
 | `INFINITY_OUTBOX_ENABLED` / `INFINITY_OUTBOX_POLL_INTERVAL_MS` / `INFINITY_OUTBOX_BATCH_SIZE` | `true` / `200` / `500` |
 
 ## Run and test
