@@ -31,6 +31,10 @@ infinity:
     jwt-secret: ${JWT_SECRET:}
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
     token-ttl: 8h
+  stream:
+    timeout: 30m
+    reconnect: 3s
+    heartbeat-ms: 15000
   alerts:
     threshold: ${ALERT_THRESHOLD:0.5}
   outbox:
