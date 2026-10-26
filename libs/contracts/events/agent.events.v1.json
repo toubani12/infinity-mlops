@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://infinity-mlops.io/contracts/events/agent.events.v1.json",
+  "title": "agent.events.v1",
+  "description": "Step of a self-healing run, published by agents-langgraph. Key: run_id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "event_id",
+    "timestamp",
+    "step",
+    "requires_approval",
+    "payload"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "step": {
+      "type": "string",
+      "enum": [
+        "received",
+        "qualified",
+        "escalated",
+        "retrain_started",
+        "retrain_finished",
+        "evaluated",
+        "approval_requested",
+        "approved",
+        "rejected",
+        "promoted",
+        "rolled_back",
+        "failed",
+        "completed"
+      ]
+    },
+    "decision": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "noise",
+        "real_drift",
+        "data_incident",
+        "promote",
+        "keep_champion",
+        null
+      ]
+    },
+    "requires_approval": {
+      "type": "boolean"
+    },
+    "message": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Step-specific data: report_id, retrain job name, champion and challenger metrics."
+    }
+  }
+}
