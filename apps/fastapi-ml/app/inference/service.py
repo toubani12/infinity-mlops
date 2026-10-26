@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
-import pandas as pd
+import numpy as np
 
 from app.core.metrics import FRAUD_SCORE, MODEL_RELOADS, PREDICTIONS, SERVED_MODEL
 from app.inference.model import FEATURES, LoadedModel, ModelLoader
@@ -104,8 +104,10 @@ class InferenceService:
             raise ModelUnavailableError("no model loaded")
         threshold = self.threshold
         started = time.perf_counter()
-        frame = pd.DataFrame([t.features for t in transactions], columns=FEATURES)
-        scores = model.predictor.predict_proba(frame)[:, 1]
+        # A plain matrix in training column order skips the per-call DataFrame validation in
+        # XGBoost, which cost about 4 ms of the 4.5 ms spent on a single-row prediction.
+        matrix = np.array([[t.features[name] for name in FEATURES] for t in transactions])
+        scores = model.predictor.predict_proba(matrix)[:, 1]
         latency_ms = (time.perf_counter() - started) * 1000.0 / len(transactions)
         results = []
         for transaction, value in zip(transactions, scores, strict=True):

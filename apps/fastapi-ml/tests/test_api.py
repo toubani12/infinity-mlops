@@ -1,9 +1,12 @@
 import time
 
+import numpy as np
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
+from app.inference.model import FEATURES
 from app.main import create_app
 from tests.conftest import StaticLoader, transaction_payload
 
@@ -95,3 +98,10 @@ def test_background_retry_loads_the_model_once_registry_is_back(predictor) -> No
         while not client.get("/health").json()["model_loaded"] and time.monotonic() < deadline:
             time.sleep(0.05)
         assert client.get("/model").json()["version"] == "1"
+
+
+def test_matrix_scores_match_dataframe_scores(predictor) -> None:
+    rows = [{name: (i + j) / 10 for j, name in enumerate(FEATURES)} for i in range(5)]
+    from_frame = predictor.predict_proba(pd.DataFrame(rows, columns=FEATURES))[:, 1]
+    from_matrix = predictor.predict_proba(np.array([[r[n] for n in FEATURES] for r in rows]))[:, 1]
+    np.testing.assert_allclose(from_matrix, from_frame)
