@@ -21,6 +21,18 @@ REST bodies use camelCase. Kafka payloads follow `libs/contracts` (snake_case). 
 
 The server generates `transactionId` and `timestamp` when they are absent; a duplicate `transactionId` returns 409. Alert status only moves forward (`OPEN` → `ACKNOWLEDGED` → `CLOSED`); going back returns 409.
 
+## Security
+
+Every `/api/**` route needs a bearer JWT signed with HS256 and `JWT_SECRET` (at least 32 bytes, the service refuses to start otherwise). Roles come from the `roles` claim: `analyst` reads and updates the API, `admin` implies `analyst` and will also approve agent runs. Missing, forged or expired tokens get 401, tokens without a known role get 403. `/actuator/health/**` and `/actuator/prometheus` stay public.
+
+Under the `local` profile only, `POST /api/auth/dev-token` with `{ "username": "ana", "role": "analyst" }` returns `{ token, expiresAt }` (8 h). SSE routes under `/api/stream/` also accept the token as `?access_token=` because `EventSource` cannot send headers; other routes ignore that parameter. CORS allows `CORS_ALLOWED_ORIGINS` (comma separated, default `http://localhost:3000`).
+
+```bash
+TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-token -H 'Content-Type: application/json' \
+  -d '{"username":"ana","role":"analyst"}' | jq -r .token)
+curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/alerts
+```
+
 ## Storage
 
 `transactions.features` is a single `double precision[]` column of 28 values in `v1`..`v28` order, with a `CHECK (cardinality(features) = 28)`. The vector is always read and written as a whole, never queried per feature, so one array column keeps the row compact (no 28 columns, no JSONB key overhead) and maps directly to the model input order. The JSON map form is rebuilt at the API boundary (`Features`).
@@ -45,12 +57,16 @@ It consumes `transaction.scored` in group `backend-spring`. Each record updates 
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `infinity` / `infinity` |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` |
 | `ALERT_THRESHOLD` | `0.5` |
+| `JWT_SECRET` | none, required |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` |
+| `SPRING_PROFILES_ACTIVE` | set `local` to enable the dev token endpoint |
 | `INFINITY_OUTBOX_ENABLED` / `INFINITY_OUTBOX_POLL_INTERVAL_MS` / `INFINITY_OUTBOX_BATCH_SIZE` | `true` / `200` / `500` |
 
 ## Run and test
 
 ```bash
-mvn spring-boot:run     # needs the PostgreSQL of infra/docker-compose.yml
+JWT_SECRET=local-dev-secret-change-me-0123456789abcdef \
+  mvn spring-boot:run -Dspring-boot.run.profiles=local   # needs the stack of infra/docker-compose.yml
 mvn -B verify           # H2 (PostgreSQL mode) slices and embedded Kafka, JaCoCo report in target/site/jacoco
 docker build -t backend-spring .
 ```
