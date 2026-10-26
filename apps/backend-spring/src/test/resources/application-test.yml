@@ -10,3 +10,5 @@ spring:
 infinity:
   outbox:
     enabled: false
+  security:
+    jwt-secret: test-secret-0123456789-0123456789-abcdef
