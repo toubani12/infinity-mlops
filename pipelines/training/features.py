@@ -5,7 +5,7 @@ import pandas as pd
 
 from data.schema import FEATURES, SECONDS_PER_DAY, TARGET, TIME
 
-__all__ = ["FEATURES", "Split", "select_window", "time_stratified_split", "xy"]
+__all__ = ["FEATURES", "Split", "select_window", "split_newest", "time_stratified_split", "xy"]
 
 
 @dataclass(frozen=True)
@@ -67,3 +67,20 @@ def time_stratified_split(
     if len(train) and len(test) and train[TIME].max() >= test[TIME].min():
         raise ValueError("training rows overlap the test period, frauds are too unevenly timed")
     return Split(train, valid, test)
+
+
+def split_newest(df: pd.DataFrame, share: float) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Older and newest rows, cut per class at its own time quantile like the main split."""
+    if not 0 < share < 1:
+        raise ValueError("share must be in (0, 1)")
+    older: list[pd.DataFrame] = []
+    newest: list[pd.DataFrame] = []
+    for _, group in df.sort_values(TIME, kind="stable").groupby(TARGET, sort=True):
+        cut = round(len(group) * (1 - share))
+        older.append(group.iloc[:cut])
+        newest.append(group.iloc[cut:])
+    return _stack(older), _stack(newest)
+
+
+def _stack(parts: list[pd.DataFrame]) -> pd.DataFrame:
+    return pd.concat(parts).sort_values(TIME, kind="stable").reset_index(drop=True)

@@ -17,6 +17,22 @@ def split_s3_uri(uri: str) -> tuple[str, str]:
     return bucket, key
 
 
+def list_files(prefix: str, suffix: str = ".parquet", client: Any = None) -> list[str]:
+    """Every file under a local folder or an s3:// prefix, sorted, filtered by suffix."""
+    if not is_s3(prefix):
+        return sorted(str(path) for path in Path(prefix).rglob(f"*{suffix}") if path.is_file())
+    bucket, _, key_prefix = prefix.removeprefix("s3://").partition("/")
+    client = client or s3_client()
+    keys: list[str] = []
+    request = {"Bucket": bucket, "Prefix": key_prefix}
+    while True:
+        page = client.list_objects_v2(**request)
+        keys += [item["Key"] for item in page.get("Contents", []) if item["Key"].endswith(suffix)]
+        if not page.get("IsTruncated"):
+            return sorted(f"s3://{bucket}/{key}" for key in keys)
+        request["ContinuationToken"] = page["NextContinuationToken"]
+
+
 def s3_endpoint() -> str | None:
     return os.environ.get("S3_ENDPOINT_URL") or os.environ.get("MLFLOW_S3_ENDPOINT_URL")
 
