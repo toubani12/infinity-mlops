@@ -44,6 +44,9 @@ public class Transaction {
     @Column(name = "scored_at")
     private Instant scoredAt;
 
+    @Column(name = "published_at")
+    private Instant publishedAt;
+
     protected Transaction() {
     }
 
@@ -61,6 +64,10 @@ public class Transaction {
         this.fraud = fraud;
         this.modelVersion = modelVersion;
         this.scoredAt = scoredAt;
+    }
+
+    public void markPublished(Instant at) {
+        this.publishedAt = at;
     }
 
     public UUID getId() {
@@ -101,5 +108,9 @@ public class Transaction {
 
     public Instant getScoredAt() {
         return scoredAt;
+    }
+
+    public Instant getPublishedAt() {
+        return publishedAt;
     }
 }
