@@ -115,3 +115,12 @@ def test_cli(tracking, tmp_path, monkeypatch, capsys) -> None:
     result = json.loads(capsys.readouterr().out)
     assert result["model_name"] == "fraud-xgb-cli" and result["version"] == "1"
     assert (tmp_path / "ref" / "reference.parquet").exists()
+
+
+def test_training_logs_threshold_and_model_card(trained) -> None:
+    _, _, _, second = trained
+    version = MlflowClient().get_model_version(second.model_name, second.version)
+    assert 0.0 < float(version.tags["decision_threshold"]) < 1.0
+    card = mlflow.artifacts.load_text(f"runs:/{second.mlflow_run_id}/model_card.md")
+    assert card.startswith(f"# Model card: {second.model_name} v{second.version}")
+    assert f"v{second.champion_version}" in card

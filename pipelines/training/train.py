@@ -27,6 +27,8 @@ from registry.promote import (
 )
 from training.evaluate import GateResult, Metrics, compare, evaluate
 from training.features import Split, select_window, time_stratified_split, xy
+from training.model_card import CardInputs, render
+from training.threshold import choose_threshold
 
 log = logging.getLogger(__name__)
 
@@ -161,7 +163,10 @@ def train_on_split(
             }
             | (params or {})
         )
-        mlflow.log_metrics(metrics.to_dict())
+        threshold = choose_threshold(
+            xy(split.valid)[1].to_numpy(), model.predict_proba(xy(split.valid)[0])[:, 1]
+        )
+        mlflow.log_metrics(metrics.to_dict() | {"decision_threshold": threshold})
         if champion:
             champion_values = champion.to_dict()
             mlflow.log_metrics({f"champion_{k}": champion_values[k] for k in CHAMPION_METRICS})
@@ -177,11 +182,29 @@ def train_on_split(
         )
 
     version = str(info.registered_model_version)
+    card = CardInputs(
+        model_name=config.model_name,
+        version=version,
+        data_window=data_window,
+        split_summary=split.summary(),
+        metrics=metrics,
+        champion_version=champion_version,
+        champion=champion,
+        gate=gate,
+        threshold=threshold,
+        params=config.params
+        | {"scale_pos_weight": round(model.get_params()["scale_pos_weight"], 3)},
+    )
+    MlflowClient().log_text(run.info.run_id, render(card), "model_card.md")
     reference_uri = write_parquet(
         reference_sample(model, split.test, version),
         reference.versioned_uri(version, reference_root),
     )
-    version_tags = {"data_window": data_window, "reference_uri": reference_uri}
+    version_tags = {
+        "data_window": data_window,
+        "reference_uri": reference_uri,
+        "decision_threshold": f"{threshold:.6f}",
+    }
     for key, value in (version_tags | ({"run_id": agent_run_id} if agent_run_id else {})).items():
         client.set_model_version_tag(config.model_name, version, key, value)
     client.set_registered_model_alias(config.model_name, CHALLENGER, version)
