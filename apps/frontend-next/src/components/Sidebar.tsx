@@ -5,8 +5,11 @@ import { usePathname } from "next/navigation";
 import { NAV_ITEMS, isActive } from "./navigation";
 
 export function Sidebar() {
-  const pathname = usePathname() ?? "";
+  return <SidebarView pathname={usePathname() ?? ""} />;
+}
 
+/** Rendered without an active item while the pathname of a dynamic route is not known yet. */
+export function SidebarView({ pathname }: { pathname: string }) {
   return (
     <aside className="bg-rail text-rail-text md:sticky md:top-0 md:flex md:h-screen md:w-64 md:flex-col">
       <div className="flex items-baseline gap-2 px-5 pt-5 pb-3 md:pt-7 md:pb-8">

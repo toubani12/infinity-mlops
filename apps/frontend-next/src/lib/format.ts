@@ -16,6 +16,11 @@ export function formatTime(iso: string, now: Date = new Date()): string {
   return date.toDateString() === now.toDateString() ? timeFormat.format(date) : dateTimeFormat.format(date);
 }
 
+export function formatWhen(iso: string, now: Date = new Date()): string {
+  const sameDay = new Date(iso).toDateString() === now.toDateString();
+  return `${sameDay ? "at" : "on"} ${formatTime(iso, now)}`;
+}
+
 export function formatScore(score: number): string {
   return score.toFixed(3);
 }
