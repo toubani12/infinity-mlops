@@ -52,7 +52,7 @@ services:
   postgres:
     image: postgres:16-alpine
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-infinity}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-infinity}
@@ -72,8 +72,8 @@ services:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     command: ["server", "/data", "--console-address", ":9001"]
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     environment:
       MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minio}
       MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-minio12345}
@@ -108,7 +108,7 @@ services:
     build: ./mlflow
     image: infinity-mlops/mlflow:local
     ports:
-      - "5000:5000"
+      - "${MLFLOW_HOST_PORT:-5000}:5000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,7 +133,7 @@ services:
     build: ../apps/backend-spring
     image: ghcr.io/toubani12/infinity-mlops/backend-spring:local
     ports:
-      - "8080:8080"
+      - "${BACKEND_HOST_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,7 +153,7 @@ services:
     build: ../apps/fastapi-ml
     image: ghcr.io/toubani12/infinity-mlops/fastapi-ml:local
     ports:
-      - "8000:8000"
+      - "${INFERENCE_HOST_PORT:-8000}:8000"
     depends_on:
       mlflow:
         condition: service_healthy
@@ -173,7 +173,7 @@ services:
     build: ../services/agents-langgraph
     image: ghcr.io/toubani12/infinity-mlops/agents-langgraph:local
     ports:
-      - "8100:8100"
+      - "${AGENT_HOST_PORT:-8100}:8100"
     depends_on:
       postgres:
         condition: service_healthy
@@ -213,7 +213,7 @@ services:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
     image: ghcr.io/toubani12/infinity-mlops/frontend-next:local
     ports:
-      - "3000:3000"
+      - "${FRONTEND_HOST_PORT:-3000}:3000"
     depends_on:
       - backend-spring
     environment:
