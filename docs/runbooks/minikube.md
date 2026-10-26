@@ -24,6 +24,7 @@ kubectl -n infinity port-forward svc/backend-spring 8080:8080
 kubectl -n infinity port-forward svc/frontend-next 3000:3000
 kubectl -n infinity port-forward svc/mlflow 5000:5000
 kubectl -n infinity port-forward svc/minio 9001:9001
+kubectl -n infinity port-forward svc/grafana 3001:3000        # dashboards, see observability.md
 ```
 
 Port-forwarding works with every minikube driver and matches the default `NEXT_PUBLIC_API_BASE_URL`. The backend and dashboard are also NodePorts 30080 and 30300; with the Docker driver on macOS, reach them through `minikube -p infinity service -n infinity frontend-next --url`.
@@ -37,7 +38,8 @@ Port-forwarding works with every minikube driver and matches the default `NEXT_P
 | Images | `:latest`, pulled | `:latest`, built in minikube, `IfNotPresent` |
 | `drift-monitor` CronJob | hourly | every 5 minutes |
 | backend Spring profile | default | `local` (enables `/api/auth/dev-token`) |
-| backend and dashboard Services | ClusterIP | NodePort |
+| backend, dashboard and Grafana Services | ClusterIP | NodePort (30080, 30300, 30301) |
+| Prometheus and Grafana requests and limits | 100m / 256-512 Mi | 25-50m / 320-384 Mi limit |
 
 ## Operate
 

@@ -7,7 +7,7 @@ Docker Compose stack defined in `infra/docker-compose.yml`. Needs Docker Desktop
 ```bash
 cp infra/env/.env.example infra/env/.env   # optional, the Makefile falls back to .env.example
 make up        # Kafka, PostgreSQL, MinIO, MLflow; waits for health, then creates topics
-make up-apps   # also builds and starts backend-spring, fastapi-ml, frontend-next, agents-langgraph, drift-monitor
+make up-apps   # also builds and starts backend-spring, fastapi-ml, frontend-next, agents-langgraph, drift-monitor, Prometheus, Grafana
 ```
 
 `make up` returns when every infrastructure container is healthy. The first run pulls images and builds the MLflow image; later runs take well under a minute.
@@ -34,6 +34,8 @@ One-shot containers run on start and exit with code 0:
 | fastapi-ml | http://localhost:8000 | `http://fastapi-ml:8000` |
 | agents-langgraph | http://localhost:8100 | `http://agents-langgraph:8100` |
 | frontend-next | http://localhost:3000 | |
+| Prometheus | http://localhost:9090 | `http://prometheus:9090` |
+| Grafana | http://localhost:3001 (anonymous read-only, `admin` / `admin`) | |
 
 ## Check health
 
