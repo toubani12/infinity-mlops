@@ -93,6 +93,31 @@ The command prints `{"model_name", "version", "alias", "previous_version"}`, the
 `<root>/reference.parquet`, the file drift-monitor reads, so drift is always measured against the
 data of the model being served.
 
+## Drift simulator
+
+```bash
+uv run python -m data.simulate_drift --scenario sudden --rows 20000 --fraud-rate 0.03 \
+  --kafka-bootstrap localhost:9092 --rate 200
+uv run python -m data.simulate_drift --scenario data-incident --incident missing \
+  --out ../data/replay.parquet
+```
+
+Rows are sampled from the last 30 % of the dataset timeline (`--fraud-rate` oversamples frauds
+so labeled PR-AUC is measurable on a short window), then:
+
+| Scenario | Effect |
+|---|---|
+| `gradual` | `v1`, `v2`, `v3`, `v4`, `v7`, `v10`, `v11`, `v12`, `v14`, `v17` shift by up to `--magnitude` standard deviations and `amount` scales by up to `1 + magnitude`, linearly from 0 at the first row to full at the last; frauds borrow legitimate values on their discriminant components with probability up to `--concept`, so the model loses PR-AUC |
+| `sudden` | the same shift and concept change, at full strength from `--change-at` (share of the rows) |
+| `data-incident` | `--incident missing`: `v4`, `v10`, `v12`, `v14` become null on `--incident-share` of the rows; `--incident out-of-domain`: huge amounts and `v14`/`v17` at ±60 on that share |
+
+Each row gets a `transaction_id` and a `timestamp` spaced by `1 / --rate` from now. Labels are
+kept only for rows at least `--labels-delay` seconds older than the last row (`--no-labels`
+drops them all). With `--kafka-bootstrap` the rows are published to `transaction.raw`, keyed by
+`transaction_id`, at `--rate` per second, with the optional `label` field; since the v1 contract
+has no nullable feature, a missing feature is sent as `0.0`, the default fill an upstream outage
+typically produces. With `--out` they are written as parquet.
+
 ## Tests
 
 ```bash
