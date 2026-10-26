@@ -1,0 +1,193 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      contracts: ${{ steps.filter.outputs.contracts }}
+      fastapi-ml: ${{ steps.filter.outputs.fastapi-ml }}
+      drift-monitor: ${{ steps.filter.outputs.drift-monitor }}
+      agents-langgraph: ${{ steps.filter.outputs.agents-langgraph }}
+      pipelines: ${{ steps.filter.outputs.pipelines }}
+      backend-spring: ${{ steps.filter.outputs.backend-spring }}
+      frontend-next: ${{ steps.filter.outputs.frontend-next }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ci: &ci
+              - '.github/workflows/ci.yml'
+              - '.github/actions/**'
+            contracts:
+              - *ci
+              - 'libs/contracts/**'
+            fastapi-ml:
+              - *ci
+              - 'apps/fastapi-ml/**'
+              - 'libs/contracts/**'
+            drift-monitor:
+              - *ci
+              - 'services/drift-monitor/**'
+              - 'libs/contracts/**'
+            agents-langgraph:
+              - *ci
+              - 'services/agents-langgraph/**'
+              - 'libs/contracts/**'
+            pipelines:
+              - *ci
+              - 'pipelines/**'
+            backend-spring:
+              - *ci
+              - 'apps/backend-spring/**'
+              - 'libs/contracts/**'
+            frontend-next:
+              - *ci
+              - 'apps/frontend-next/**'
+
+  contracts:
+    needs: changes
+    if: needs.changes.outputs.contracts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - if: hashFiles('libs/contracts/pyproject.toml') == ''
+        run: echo "::notice::libs/contracts has no pyproject.toml yet, skipping"
+      - if: hashFiles('libs/contracts/pyproject.toml') != ''
+        uses: ./.github/actions/uv-checks
+        with:
+          path: libs/contracts
+
+  fastapi-ml:
+    needs: changes
+    if: needs.changes.outputs.fastapi-ml == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - if: hashFiles('apps/fastapi-ml/pyproject.toml') == ''
+        run: echo "::notice::apps/fastapi-ml has no pyproject.toml yet, skipping"
+      - if: hashFiles('apps/fastapi-ml/pyproject.toml') != ''
+        uses: ./.github/actions/uv-checks
+        with:
+          path: apps/fastapi-ml
+
+  drift-monitor:
+    needs: changes
+    if: needs.changes.outputs.drift-monitor == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - if: hashFiles('services/drift-monitor/pyproject.toml') == ''
+        run: echo "::notice::services/drift-monitor has no pyproject.toml yet, skipping"
+      - if: hashFiles('services/drift-monitor/pyproject.toml') != ''
+        uses: ./.github/actions/uv-checks
+        with:
+          path: services/drift-monitor
+
+  agents-langgraph:
+    needs: changes
+    if: needs.changes.outputs.agents-langgraph == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - if: hashFiles('services/agents-langgraph/pyproject.toml') == ''
+        run: echo "::notice::services/agents-langgraph has no pyproject.toml yet, skipping"
+      - if: hashFiles('services/agents-langgraph/pyproject.toml') != ''
+        uses: ./.github/actions/uv-checks
+        with:
+          path: services/agents-langgraph
+
+  pipelines:
+    needs: changes
+    if: needs.changes.outputs.pipelines == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - if: hashFiles('pipelines/pyproject.toml') == ''
+        run: echo "::notice::pipelines has no pyproject.toml yet, skipping"
+      - if: hashFiles('pipelines/pyproject.toml') != ''
+        uses: ./.github/actions/uv-checks
+        with:
+          path: pipelines
+
+  backend-spring:
+    needs: changes
+    if: needs.changes.outputs.backend-spring == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend-spring
+    steps:
+      - uses: actions/checkout@v4
+      - if: hashFiles('apps/backend-spring/pom.xml') == ''
+        run: echo "::notice::apps/backend-spring has no pom.xml yet, skipping"
+        working-directory: .
+      - if: hashFiles('apps/backend-spring/pom.xml') != ''
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: apps/backend-spring/pom.xml
+      - if: hashFiles('apps/backend-spring/pom.xml') != ''
+        run: mvn -B verify
+
+  frontend-next:
+    needs: changes
+    if: needs.changes.outputs.frontend-next == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend-next
+    steps:
+      - uses: actions/checkout@v4
+      - if: hashFiles('apps/frontend-next/package-lock.json') == ''
+        run: echo "::notice::apps/frontend-next has no package-lock.json yet, skipping"
+        working-directory: .
+      - if: hashFiles('apps/frontend-next/package-lock.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/frontend-next/package-lock.json
+      - if: hashFiles('apps/frontend-next/package-lock.json') != ''
+        run: npm ci
+      - if: hashFiles('apps/frontend-next/package-lock.json') != ''
+        run: npm run lint
+      - if: hashFiles('apps/frontend-next/package-lock.json') != ''
+        run: npm run build
+      - if: hashFiles('apps/frontend-next/package-lock.json') != ''
+        run: npm test --if-present
+
+  # The only required build check: it passes when every job succeeded or was skipped by the path filter.
+  ci-gate:
+    name: ci-gate
+    if: always()
+    needs:
+      - changes
+      - contracts
+      - fastapi-ml
+      - drift-monitor
+      - agents-langgraph
+      - pipelines
+      - backend-spring
+      - frontend-next
+    runs-on: ubuntu-latest
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - run: echo "all required jobs passed or were skipped"
