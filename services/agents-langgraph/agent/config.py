@@ -28,4 +28,14 @@ class Settings(BaseSettings):
     out_of_range_threshold: float = 0.05
     max_p95_latency_ms: float = 50.0
 
+    k8s_namespace: str = "infinity"
+    retrain_template_path: str = "/etc/agent/retrain/retrain-job.yaml"
+    retrain_poll_seconds: float = 10.0
+    # activeDeadlineSeconds of the template (1800) plus time to schedule and pull the image.
+    retrain_timeout_seconds: float = 2100.0
+    retrain_window_days: int = 7
+    retrain_train_config: str = "configs/xgb_baseline.yaml"
+    retrain_data_uri: str = "s3://datasets/raw/creditcard.parquet"
+    retrain_predictions_uri: str = "s3://predictions/"
+
     http_port: int = 8100
