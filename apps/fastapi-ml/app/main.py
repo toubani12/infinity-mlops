@@ -4,6 +4,7 @@ import logging
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request, Response
 
@@ -12,6 +13,7 @@ from app.core.config import Settings, get_settings
 from app.core.metrics import REQUEST_LATENCY
 from app.inference.model import MlflowModelLoader, ModelLoader
 from app.inference.service import InferenceService, ModelUnavailableError
+from app.messaging.consumer import KafkaScoring
 
 log = logging.getLogger(__name__)
 
@@ -34,18 +36,32 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         retry = asyncio.create_task(
             load_until_ready(service, app.state.settings.model_retry_seconds)
         )
+    kafka = (
+        app.state.kafka_factory(app.state.settings, service)
+        if app.state.settings.kafka_enabled
+        else None
+    )
+    if kafka:
+        await kafka.start()
     yield
+    if kafka:
+        await kafka.stop()
     if retry:
         retry.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await retry
 
 
-def create_app(settings: Settings | None = None, loader: ModelLoader | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    loader: ModelLoader | None = None,
+    kafka_factory: Callable[[Settings, InferenceService], Any] = KafkaScoring,
+) -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     settings = settings or get_settings()
     app = FastAPI(title="fastapi-ml inference", version="1.0.0", lifespan=lifespan)
     app.state.settings = settings
+    app.state.kafka_factory = kafka_factory
     app.state.service = InferenceService(
         loader or MlflowModelLoader(settings.mlflow_tracking_uri),
         settings.model_name,
