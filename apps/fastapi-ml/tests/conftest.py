@@ -45,6 +45,11 @@ class StaticLoader:
         return LoadedModel(name=name, version=version, alias=alias, predictor=self.predictor)
 
 
+@pytest.fixture(autouse=True)
+def no_default_prediction_log(monkeypatch) -> None:
+    monkeypatch.setenv("PREDICTION_LOG_ENABLED", "false")
+
+
 @pytest.fixture
 def settings() -> Settings:
     return Settings(model_name="fraud-xgb", mlflow_tracking_uri="sqlite:///unused.db")

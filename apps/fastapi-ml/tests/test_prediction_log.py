@@ -5,7 +5,9 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
+from fastapi.testclient import TestClient
 
+from app.core.config import Settings
 from app.inference.model import FEATURES
 from app.inference.prediction_log import (
     COLUMNS,
@@ -15,6 +17,8 @@ from app.inference.prediction_log import (
     store_from_uri,
 )
 from app.inference.service import Score, Transaction
+from app.main import build_prediction_log, create_app
+from tests.conftest import StaticLoader, transaction_payload
 
 NOW = datetime(2026, 10, 26, 9, 59, 30, tzinfo=UTC)
 
@@ -133,3 +137,21 @@ def test_periodic_flush(tmp_path) -> None:
         return list(tmp_path.rglob("*.parquet"))
 
     assert len(asyncio.run(scenario())) == 1
+
+
+def test_build_from_settings(tmp_path) -> None:
+    assert build_prediction_log(Settings(prediction_log_enabled=False)) is None
+    settings = Settings(prediction_log_enabled=True, prediction_log_uri=str(tmp_path))
+    assert isinstance(build_prediction_log(settings), PredictionLogWriter)
+
+
+def test_api_predictions_are_logged_on_shutdown(tmp_path, settings, predictor) -> None:
+    requests = 3
+    writer = PredictionLogWriter(LocalPredictionStore(tmp_path))
+    app = create_app(settings, StaticLoader(predictor), prediction_log=writer)
+    with TestClient(app) as client:
+        ids = [client.post("/predict", json=transaction_payload()).json() for _ in range(requests)]
+    (path,) = tmp_path.rglob("*.parquet")
+    frame = pd.read_parquet(path)
+    assert sorted(frame["transaction_id"]) == sorted(r["transaction_id"] for r in ids)
+    assert frame["amount"].tolist() == [42.5] * requests
