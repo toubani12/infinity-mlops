@@ -45,6 +45,7 @@ class TrainConfig:
     max_p95_ms: float = 50.0
     synthetic_rows: int = 284_807
     synthetic_fraud_rate: float = 0.00172
+    retrain: dict[str, float] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: str | Path) -> "TrainConfig":
@@ -116,13 +117,36 @@ def train(
 ) -> TrainingResult:
     validate(frame)
     data = select_window(prepare(frame), window_days)
-    split = time_stratified_split(data, config.fractions)
-    window = describe_window(data, window_days)
+    return train_on_split(
+        time_stratified_split(data, config.fractions),
+        config,
+        data_window=describe_window(data, window_days),
+        params={"window_days": window_days or "all", "rows": len(data)},
+        agent_run_id=agent_run_id,
+        bootstrap=bootstrap,
+        reference_root=reference_root,
+    )
+
+
+def train_on_split(
+    split: Split,
+    config: TrainConfig,
+    *,
+    data_window: str,
+    params: dict[str, Any] | None = None,
+    run_tags: dict[str, str] | None = None,
+    agent_run_id: str | None = None,
+    bootstrap: bool = False,
+    reference_root: str | None = None,
+) -> TrainingResult:
+    """Fit on train, stop early on valid, score challenger and champion on test, register the
+    version as @challenger and write its reference sample."""
     client = MlflowClient()
     mlflow.set_experiment(config.experiment)
 
-    run_tags = {"data_window": window} | ({"agent_run_id": agent_run_id} if agent_run_id else {})
-    with mlflow.start_run(tags=run_tags) as run:
+    tags = {"data_window": data_window} | (run_tags or {})
+    tags |= {"agent_run_id": agent_run_id} if agent_run_id else {}
+    with mlflow.start_run(tags=tags) as run:
         model = fit(split, config)
         metrics = evaluate(model, *xy(split.test), config.latency_samples)
         champion_version, champion = score_champion(client, config, split.test)
@@ -134,15 +158,16 @@ def train(
                 "scale_pos_weight": round(model.get_params()["scale_pos_weight"], 3),
                 "best_iteration": model.best_iteration,
                 "early_stopping_rounds": config.early_stopping_rounds,
-                "window_days": window_days or "all",
-                "rows": len(data),
             }
+            | (params or {})
         )
         mlflow.log_metrics(metrics.to_dict())
         if champion:
             champion_values = champion.to_dict()
             mlflow.log_metrics({f"champion_{k}": champion_values[k] for k in CHAMPION_METRICS})
-        mlflow.set_tag("gate_passed", str(gate.passed).lower())
+        mlflow.set_tags(
+            {"gate_passed": str(gate.passed).lower(), "gate_reasons": "; ".join(gate.reasons)}
+        )
         mlflow.log_dict({"split": split.summary(), "gate": asdict(gate)}, "evaluation.json")
         example = split.test[FEATURES].head(5)
         info = mlflow.xgboost.log_model(
@@ -158,7 +183,7 @@ def train(
         reference_sample(model, split.test, version),
         reference.versioned_uri(version, reference_root),
     )
-    version_tags = {"data_window": window, "reference_uri": reference_uri}
+    version_tags = {"data_window": data_window, "reference_uri": reference_uri}
     for key, value in (version_tags | ({"run_id": agent_run_id} if agent_run_id else {})).items():
         client.set_model_version_tag(config.model_name, version, key, value)
     client.set_registered_model_alias(config.model_name, CHALLENGER, version)
