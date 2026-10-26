@@ -96,8 +96,12 @@ Approve and reject need the `admin` role and answer 409 unless the run is `AWAIT
 ```bash
 JWT_SECRET=local-dev-secret-change-me-0123456789abcdef \
   mvn spring-boot:run -Dspring-boot.run.profiles=local   # needs the stack of infra/docker-compose.yml
-mvn -B verify           # H2 (PostgreSQL mode) slices and embedded Kafka, JaCoCo report in target/site/jacoco
+mvn -B verify                                   # every test, JaCoCo report in target/site/jacoco
+mvn -B verify -DexcludedGroups=integration      # skip the Testcontainers suite for a fast loop
+mvn -B verify -Dgroups=integration              # only the Testcontainers suite
 docker build -t backend-spring .
 ```
 
-The migrations only use SQL accepted by both PostgreSQL and H2, so the `@DataJpaTest` slices run the real Flyway scripts without Docker. The messaging tests validate payloads against `../../libs/contracts/events` (override with `-Dcontracts.dir=...`), so run them from a full checkout.
+`PlatformFlowIntegrationTest` (tag `integration`) starts `postgres:16-alpine` and `apache/kafka:3.9.1`, the images of `infra/docker-compose.yml`, and checks the whole path on real infrastructure: Flyway on PostgreSQL, `POST /api/transactions` through the outbox to `transaction.raw`, `transaction.scored` to an open alert, `agent.events` to a run awaiting approval, and an admin approval to `agent.commands`, every message validated against `libs/contracts`. It needs a Docker daemon: without one the class is reported as skipped (`@Testcontainers(disabledWithoutDocker = true)`), so the build still passes on machines without Docker. GitHub runners have Docker, so CI runs it as part of `mvn -B verify`.
+
+The other tests need no Docker. The migrations only use SQL accepted by both PostgreSQL and H2, so the `@DataJpaTest` slices run the real Flyway scripts without Docker. The messaging tests validate payloads against `../../libs/contracts/events` (override with `-Dcontracts.dir=...`), so run them from a full checkout.
