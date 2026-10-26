@@ -1,0 +1,7 @@
+TIME = "time"
+AMOUNT = "amount"
+TARGET = "class"
+V_FEATURES = [f"v{i}" for i in range(1, 29)]
+FEATURES = [*V_FEATURES, AMOUNT]
+RAW_COLUMNS = [TIME, *V_FEATURES, AMOUNT, TARGET]
+SECONDS_PER_DAY = 86_400
