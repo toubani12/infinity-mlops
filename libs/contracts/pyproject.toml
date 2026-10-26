@@ -1,0 +1,24 @@
+[project]
+name = "infinity-contracts"
+version = "1.0.0"
+description = "Event schemas and API contracts shared by Infinity MLOps services"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "jsonschema[format]>=4.23",
+    "pytest>=8.3",
+    "pyyaml>=6.0",
+    "ruff>=0.7",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

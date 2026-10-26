@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://infinity-mlops.io/contracts/events/transaction.scored.v1.json",
+  "title": "transaction.scored.v1",
+  "description": "Fraud score produced by fastapi-ml. Key: transaction_id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "transaction_id",
+    "timestamp",
+    "fraud_score",
+    "is_fraud",
+    "model_version",
+    "latency_ms"
+  ],
+  "properties": {
+    "transaction_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "fraud_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "is_fraud": {
+      "type": "boolean"
+    },
+    "threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "model_name": {
+      "type": "string"
+    },
+    "model_version": {
+      "type": "string"
+    },
+    "latency_ms": {
+      "type": "number",
+      "minimum": 0
+    }
+  }
+}
