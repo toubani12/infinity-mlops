@@ -48,6 +48,51 @@ stopping; the split raises `ValueError` if any training row reaches into the tes
 test metrics are always measured on data strictly later than everything the model learned from.
 `Split.summary()` reports rows, frauds, fraud rate and time range per block.
 
+## Training
+
+```bash
+MLFLOW_TRACKING_URI=http://localhost:5000 uv run python -m training.train \
+  --data ../data/creditcard.csv --config configs/xgb_baseline.yaml --bootstrap-champion
+```
+
+Options: `--window-days N` keeps the last N days of data, `--run-id` is the agent run that asked
+for the training (stored as the `run_id` tag of the model version), `--reference-root` overrides
+where reference samples go. `--data` accepts a local or `s3://` CSV or parquet; a missing local
+file falls back to synthetic data.
+
+One run:
+
+1. validates the frame, applies the window and the time-ordered stratified split;
+2. fits `XGBClassifier` with `scale_pos_weight = negatives / positives` of the train block and
+   early stopping on the valid block (`configs/xgb_baseline.yaml`);
+3. evaluates on the test block: `pr_auc`, `recall_at_p90`, `roc_auc`, `p95_latency_ms`
+   (single-row `predict_proba` calls);
+4. when a champion exists, evaluates it on the same test block, logs `champion_pr_auc`,
+   `champion_recall_at_p90`, `champion_p95_latency_ms` and the `gate_passed` tag
+   (`training.evaluate.compare`: PR-AUC and recall at 90 % precision both at least the champion's,
+   p95 under 50 ms);
+5. logs params, metrics, `evaluation.json` (split summary, gate reasons) and the model
+   (`mlflow.xgboost`), registers it as `fraud-xgb` (`MODEL_NAME`) and sets `@challenger`;
+6. writes the reference sample (test block with `fraud_score`, `label`, `model_version`) to
+   `<root>/v<version>/reference.parquet`, root being `s3://datasets/reference` when
+   `S3_ENDPOINT_URL` or `MLFLOW_S3_ENDPOINT_URL` is set and `data/reference` otherwise.
+
+`--bootstrap-champion` sets `@champion` on the new version when no champion exists yet, for the
+very first model. Consumers load the model with
+`mlflow.xgboost.load_model("models:/fraud-xgb@champion")` and call `predict_proba`.
+
+## Registry
+
+```bash
+uv run python -m registry.promote                  # @champion -> version behind @challenger
+uv run python -m registry.promote --version 3      # explicit version, also used for rollback
+```
+
+The command prints `{"model_name", "version", "alias", "previous_version"}`, the fields of
+`model.promoted`. Whenever `@champion` moves, the version's reference sample is copied to
+`<root>/reference.parquet`, the file drift-monitor reads, so drift is always measured against the
+data of the model being served.
+
 ## Tests
 
 ```bash
