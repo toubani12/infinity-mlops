@@ -1,0 +1,13 @@
+# The local profile enables POST /api/auth/dev-token, which the demo uses to log in.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-spring
+spec:
+  template:
+    spec:
+      containers:
+        - name: backend-spring
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: local

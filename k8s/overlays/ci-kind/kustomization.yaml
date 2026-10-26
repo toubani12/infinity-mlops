@@ -1,0 +1,67 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: infinity
+
+resources:
+  - ../../base
+
+# CI builds every image with the tag "ci" and loads it into the kind cluster.
+images:
+  - name: ghcr.io/toubani12/infinity-mlops/backend-spring
+    newTag: ci
+  - name: ghcr.io/toubani12/infinity-mlops/fastapi-ml
+    newTag: ci
+  - name: ghcr.io/toubani12/infinity-mlops/frontend-next
+    newTag: ci
+  - name: ghcr.io/toubani12/infinity-mlops/agents-langgraph
+    newTag: ci
+  - name: ghcr.io/toubani12/infinity-mlops/drift-monitor
+    newTag: ci
+  - name: ghcr.io/toubani12/infinity-mlops/mlflow
+    newTag: ci
+
+replicas:
+  - name: backend-spring
+    count: 1
+  - name: fastapi-ml
+    count: 1
+  - name: frontend-next
+    count: 1
+
+# Throwaway credentials for an ephemeral kind cluster, never used elsewhere.
+secretGenerator:
+  - name: platform-secrets
+    literals:
+      - AWS_ACCESS_KEY_ID=minio
+      - AWS_SECRET_ACCESS_KEY=minio12345
+      - POSTGRES_USER=infinity
+      - POSTGRES_PASSWORD=infinity
+      - JWT_SECRET=ci-only-secret-0123456789abcdef0123456789
+
+# kind shares a small CI runner: near-zero requests let every pod schedule, base limits still apply.
+patches:
+  - path: resources.yaml
+    target:
+      kind: (Deployment|StatefulSet)
+  - target:
+      kind: CronJob
+    patch: |-
+      - op: replace
+        path: /spec/jobTemplate/spec/template/spec/containers/0/resources/requests
+        value:
+          cpu: 10m
+          memory: 64Mi
+  - path: backend-local-profile.yaml
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+  - target:
+      kind: CronJob
+    patch: |-
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent

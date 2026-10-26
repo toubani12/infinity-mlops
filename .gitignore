@@ -24,3 +24,6 @@ target/
 /agents/
 .claude/
 CLAUDE.md
+
+# kustomize secretGenerator inputs
+k8s/overlays/*/secrets.env

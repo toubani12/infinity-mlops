@@ -1,0 +1,53 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: infinity
+
+resources:
+  - ../../base
+
+images:
+  - name: ghcr.io/toubani12/infinity-mlops/backend-spring
+    newTag: latest
+  - name: ghcr.io/toubani12/infinity-mlops/fastapi-ml
+    newTag: latest
+  - name: ghcr.io/toubani12/infinity-mlops/frontend-next
+    newTag: latest
+  - name: ghcr.io/toubani12/infinity-mlops/agents-langgraph
+    newTag: latest
+  - name: ghcr.io/toubani12/infinity-mlops/drift-monitor
+    newTag: latest
+  - name: ghcr.io/toubani12/infinity-mlops/mlflow
+    newTag: latest
+
+replicas:
+  - name: backend-spring
+    count: 1
+  - name: fastapi-ml
+    count: 1
+  - name: frontend-next
+    count: 1
+
+secretGenerator:
+  - name: platform-secrets
+    envs:
+      - secrets.env
+
+patches:
+  - path: resources.yaml
+  - path: services.yaml
+  - path: backend-local-profile.yaml
+  - path: drift-every-5-minutes.yaml
+  # Images are built inside minikube's Docker daemon, so the kubelet must not try to pull them.
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+  - target:
+      kind: CronJob
+    patch: |-
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
