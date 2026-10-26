@@ -2,6 +2,7 @@ import { Suspense, type ReactNode } from "react";
 import { ChampionBadge } from "@/components/ChampionBadge";
 import { RequireSession } from "@/components/RequireSession";
 import { SessionMenu } from "@/components/SessionMenu";
+import { StreamHealthIndicator } from "@/components/StreamHealthIndicator";
 import { Sidebar, SidebarView } from "@/components/Sidebar";
 
 export default function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
@@ -12,6 +13,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
       </Suspense>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 px-4 pt-4 sm:px-8 md:pt-6">
+          <StreamHealthIndicator />
           <SessionMenu />
           <ChampionBadge />
         </div>
