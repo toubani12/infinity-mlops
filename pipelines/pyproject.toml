@@ -5,6 +5,7 @@ description = "Ingestion, validation, training and registry jobs for the fraud m
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiokafka>=0.14.0",
     "boto3>=1.43.118",
     "mlflow==3.17.2",
     "numpy>=2.5.4",
@@ -17,6 +18,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "jsonschema[format-nongpl]>=4.26.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.2",
