@@ -15,9 +15,14 @@ spec:
       labels:
         app.kubernetes.io/name: minio
     spec:
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
       containers:
         - name: minio
-          image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+          image: bitnamilegacy/minio:2025.7.23
+          command: ["minio"]
           args: ["server", "/data", "--console-address", ":9001"]
           ports:
             - name: api
