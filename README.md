@@ -35,3 +35,14 @@ git config pull.rebase true
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branches, commit format and the pull request flow.
+
+## Local stack
+
+```bash
+make up        # Kafka KRaft, PostgreSQL, MinIO, MLflow with buckets and topics
+make up-apps   # plus the application services
+make ps        # health of every container
+make down      # stop; make reset also deletes the volumes
+```
+
+Details in [docs/runbooks/local-stack.md](docs/runbooks/local-stack.md). Ports and environment variables: [docs/architecture/runtime-conventions.md](docs/architecture/runtime-conventions.md). Architecture: [docs/architecture/overview.md](docs/architecture/overview.md).
