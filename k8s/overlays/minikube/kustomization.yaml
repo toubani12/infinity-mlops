@@ -30,6 +30,8 @@ replicas:
 
 secretGenerator:
   - name: platform-secrets
+    options:
+      disableNameSuffixHash: true
     envs:
       - secrets.env
 

@@ -1,0 +1,15 @@
+# The agent's whole Kubernetes surface: create and follow retrain Jobs, read their pod logs.
+# No update, patch or delete, and nothing outside namespace infinity.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: agents-langgraph-retrain
+  labels:
+    app.kubernetes.io/name: agents-langgraph
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list"]

@@ -32,6 +32,8 @@ replicas:
 # Throwaway credentials for an ephemeral kind cluster, never used elsewhere.
 secretGenerator:
   - name: platform-secrets
+    options:
+      disableNameSuffixHash: true
     literals:
       - AWS_ACCESS_KEY_ID=minio
       - AWS_SECRET_ACCESS_KEY=minio12345

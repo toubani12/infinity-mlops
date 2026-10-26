@@ -19,8 +19,12 @@ resources:
   - agents-langgraph
   - drift-monitor
 
+# platform-config and platform-secrets keep stable names: the retrain Job created at runtime by
+# the agent references them by name, and kustomize cannot rewrite a hash suffix it never sees.
 configMapGenerator:
   - name: platform-config
+    options:
+      disableNameSuffixHash: true
     literals:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - MLFLOW_TRACKING_URI=http://mlflow:5000
