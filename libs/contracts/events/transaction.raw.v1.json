@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://infinity-mlops.io/contracts/events/transaction.raw.v1.json",
+  "title": "transaction.raw.v1",
+  "description": "Transaction accepted by backend-spring, to be scored. Key: transaction_id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "transaction_id",
+    "timestamp",
+    "amount",
+    "v1",
+    "v2",
+    "v3",
+    "v4",
+    "v5",
+    "v6",
+    "v7",
+    "v8",
+    "v9",
+    "v10",
+    "v11",
+    "v12",
+    "v13",
+    "v14",
+    "v15",
+    "v16",
+    "v17",
+    "v18",
+    "v19",
+    "v20",
+    "v21",
+    "v22",
+    "v23",
+    "v24",
+    "v25",
+    "v26",
+    "v27",
+    "v28"
+  ],
+  "properties": {
+    "transaction_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "amount": {
+      "type": "number",
+      "minimum": 0
+    },
+    "v1": {
+      "type": "number"
+    },
+    "v2": {
+      "type": "number"
+    },
+    "v3": {
+      "type": "number"
+    },
+    "v4": {
+      "type": "number"
+    },
+    "v5": {
+      "type": "number"
+    },
+    "v6": {
+      "type": "number"
+    },
+    "v7": {
+      "type": "number"
+    },
+    "v8": {
+      "type": "number"
+    },
+    "v9": {
+      "type": "number"
+    },
+    "v10": {
+      "type": "number"
+    },
+    "v11": {
+      "type": "number"
+    },
+    "v12": {
+      "type": "number"
+    },
+    "v13": {
+      "type": "number"
+    },
+    "v14": {
+      "type": "number"
+    },
+    "v15": {
+      "type": "number"
+    },
+    "v16": {
+      "type": "number"
+    },
+    "v17": {
+      "type": "number"
+    },
+    "v18": {
+      "type": "number"
+    },
+    "v19": {
+      "type": "number"
+    },
+    "v20": {
+      "type": "number"
+    },
+    "v21": {
+      "type": "number"
+    },
+    "v22": {
+      "type": "number"
+    },
+    "v23": {
+      "type": "number"
+    },
+    "v24": {
+      "type": "number"
+    },
+    "v25": {
+      "type": "number"
+    },
+    "v26": {
+      "type": "number"
+    },
+    "v27": {
+      "type": "number"
+    },
+    "v28": {
+      "type": "number"
+    },
+    "label": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "enum": [
+        0,
+        1,
+        null
+      ],
+      "description": "Ground truth when known (replay and simulation only)."
+    }
+  }
+}
