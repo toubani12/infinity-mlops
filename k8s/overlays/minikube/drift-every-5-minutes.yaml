@@ -1,0 +1,6 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drift-monitor
+spec:
+  schedule: "*/5 * * * *"
