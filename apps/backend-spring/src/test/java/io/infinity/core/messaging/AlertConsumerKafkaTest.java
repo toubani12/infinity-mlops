@@ -22,7 +22,8 @@ import org.springframework.test.context.ActiveProfiles;
         "infinity.alerts.threshold=0.5"
 })
 @ActiveProfiles("test")
-@EmbeddedKafka(partitions = 1, topics = {Topics.TRANSACTION_SCORED, Topics.DRIFT_DETECTED, Topics.MODEL_PROMOTED})
+@EmbeddedKafka(partitions = 1, topics = {Topics.TRANSACTION_SCORED, Topics.DRIFT_DETECTED, Topics.MODEL_PROMOTED,
+        Topics.AGENT_EVENTS})
 class AlertConsumerKafkaTest {
 
     @Autowired

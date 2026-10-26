@@ -3,6 +3,7 @@ package io.infinity.core.messaging;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.infinity.core.alert.ScoreIngestionService;
+import io.infinity.core.modelops.AgentRunService;
 import io.infinity.core.modelops.ModelOpsService;
 import java.time.Clock;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -14,13 +15,15 @@ public class InboundEventListener {
     private final ObjectMapper json;
     private final ScoreIngestionService scores;
     private final ModelOpsService modelOps;
+    private final AgentRunService agentRuns;
     private final Clock clock;
 
-    public InboundEventListener(
-            ObjectMapper json, ScoreIngestionService scores, ModelOpsService modelOps, Clock clock) {
+    public InboundEventListener(ObjectMapper json, ScoreIngestionService scores, ModelOpsService modelOps,
+            AgentRunService agentRuns, Clock clock) {
         this.json = json;
         this.scores = scores;
         this.modelOps = modelOps;
+        this.agentRuns = agentRuns;
         this.clock = clock;
     }
 
@@ -37,6 +40,11 @@ public class InboundEventListener {
     @KafkaListener(topics = Topics.MODEL_PROMOTED)
     public void onModelPromoted(String payload) {
         modelOps.recordModelVersion(read(payload, ModelPromotedMessage.class).toEvent(clock.instant()));
+    }
+
+    @KafkaListener(topics = Topics.AGENT_EVENTS)
+    public void onAgentEvent(String payload) {
+        agentRuns.record(read(payload, AgentEventMessage.class).toStepEvent());
     }
 
     private <T> T read(String payload, Class<T> type) {
