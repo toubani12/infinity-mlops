@@ -25,19 +25,27 @@ The server generates `transactionId` and `timestamp` when they are absent; a dup
 
 `received_at` is set by the server and drives the default ordering, so replayed transactions with old `timestamp` values still show up first in the live views. Scoring fields (`fraud_score`, `is_fraud`, `model_version`, `scored_at`) stay null until `transaction.scored` arrives.
 
+## Messaging
+
+Accepted transactions are published to `transaction.raw`, key `transaction_id`, value exactly the v1 contract (`transaction_id`, `timestamp`, `amount`, `v1`..`v28`, plus `label` when known).
+
+The `transactions` table is its own outbox. `POST /api/transactions` only commits the row; `TransactionRawRelay` runs every 200 ms, takes up to 500 rows with `published_at IS NULL` in arrival order, sends them and sets `published_at` for the ones the broker acknowledged. A row whose send fails or times out stays pending and is retried on the next run, so a Kafka outage never loses a transaction and never fails the API call. Delivery is at least once (a crash after the ack and before the commit republishes the row); consumers dedupe on `transaction_id`. Metrics: `infinity_outbox_published_total` and `infinity_outbox_failed_total`.
+
 ## Configuration
 
 | Variable | Default |
 |---|---|
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/infinity` |
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `infinity` / `infinity` |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` |
+| `INFINITY_OUTBOX_ENABLED` / `INFINITY_OUTBOX_POLL_INTERVAL_MS` / `INFINITY_OUTBOX_BATCH_SIZE` | `true` / `200` / `500` |
 
 ## Run and test
 
 ```bash
 mvn spring-boot:run     # needs the PostgreSQL of infra/docker-compose.yml
-mvn -B verify           # unit and slice tests on H2 (PostgreSQL mode), JaCoCo report in target/site/jacoco
+mvn -B verify           # H2 (PostgreSQL mode) slices and embedded Kafka, JaCoCo report in target/site/jacoco
 docker build -t backend-spring .
 ```
 
-The migrations only use SQL accepted by both PostgreSQL and H2, so the `@DataJpaTest` slices run the real Flyway scripts without Docker.
+The migrations only use SQL accepted by both PostgreSQL and H2, so the `@DataJpaTest` slices run the real Flyway scripts without Docker. The messaging tests validate payloads against `../../libs/contracts/events` (override with `-Dcontracts.dir=...`), so run them from a full checkout.
