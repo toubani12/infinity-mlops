@@ -23,6 +23,7 @@ def model_info(service: InferenceService) -> ModelInfo:
         alias=model.alias,
         loaded_at=model.loaded_at,
         threshold=service.threshold,
+        last_reload_error=service.last_reload_error,
     )
 
 

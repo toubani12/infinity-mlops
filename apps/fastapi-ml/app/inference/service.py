@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 import time
 from collections.abc import Callable
@@ -7,7 +8,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from app.core.metrics import FRAUD_SCORE, MODEL_RELOADS, PREDICTIONS
+from app.core.metrics import FRAUD_SCORE, MODEL_RELOADS, PREDICTIONS, SERVED_MODEL
 from app.inference.model import FEATURES, LoadedModel, ModelLoader
 
 log = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ class InferenceService:
         self.threshold = threshold
         self._model: LoadedModel | None = None
         self._reload_lock = asyncio.Lock()
+        self.last_reload_error: str | None = None
 
     @property
     def model(self) -> LoadedModel | None:
@@ -65,10 +67,16 @@ class InferenceService:
                 loaded = await asyncio.to_thread(self._loader.load, self._name, self._alias)
             except Exception as error:
                 MODEL_RELOADS.labels("failure").inc()
+                self.last_reload_error = f"{type(error).__name__}: {error}"
                 log.warning("model reload failed, keeping %s: %s", self.describe(), error)
                 raise ModelUnavailableError(str(error)) from error
             previous, self._model = self._model, loaded
+            self.last_reload_error = None
             MODEL_RELOADS.labels("success").inc()
+            if previous and previous.version != loaded.version:
+                with contextlib.suppress(KeyError):
+                    SERVED_MODEL.remove(previous.name, previous.version)
+            SERVED_MODEL.labels(loaded.name, loaded.version).set(1)
             log.info(
                 "serving %s v%s (was %s)",
                 loaded.name,

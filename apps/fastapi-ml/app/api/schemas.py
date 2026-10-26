@@ -43,6 +43,7 @@ class ModelInfo(BaseModel):
     alias: str
     loaded_at: datetime
     threshold: float
+    last_reload_error: str | None = None
 
 
 class Health(BaseModel):
