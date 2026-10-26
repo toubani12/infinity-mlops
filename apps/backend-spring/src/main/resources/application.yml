@@ -12,6 +12,23 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        linger.ms: 5
+        max.block.ms: 5000
+        request.timeout.ms: 5000
+        delivery.timeout.ms: 10000
+
+infinity:
+  outbox:
+    enabled: true
+    batch-size: 500
+    send-timeout: 10s
+    poll-interval-ms: 200
 
 server:
   port: 8080
