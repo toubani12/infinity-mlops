@@ -15,7 +15,7 @@ import java.nio.file.Path;
 import java.util.Set;
 
 /** Reads the shared contracts from the monorepo; override the location with -Dcontracts.dir. */
-final class ContractSchemas {
+public final class ContractSchemas {
 
     static final Path CONTRACTS_DIR = Path.of(System.getProperty("contracts.dir", "../../libs/contracts"));
 
@@ -26,7 +26,7 @@ final class ContractSchemas {
     private ContractSchemas() {
     }
 
-    static Set<ValidationMessage> validate(String topic, String payload) {
+    public static Set<ValidationMessage> validate(String topic, String payload) {
         try {
             return schema(topic).validate(JSON.readTree(payload));
         } catch (IOException e) {
@@ -34,7 +34,7 @@ final class ContractSchemas {
         }
     }
 
-    static String example(String topic) {
+    public static String example(String topic) {
         try {
             return Files.readString(CONTRACTS_DIR.resolve("examples").resolve(topic + ".v1.json"));
         } catch (IOException e) {
@@ -42,7 +42,7 @@ final class ContractSchemas {
         }
     }
 
-    static JsonNode readTree(String payload) {
+    public static JsonNode readTree(String payload) {
         try {
             return JSON.readTree(payload);
         } catch (IOException e) {
