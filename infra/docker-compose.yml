@@ -224,7 +224,41 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
 
+  prometheus:
+    profiles: [apps]
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=2d
+    ports:
+      - "${PROMETHEUS_HOST_PORT:-9090}:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  # Provisioning and dashboard are shared with Kubernetes, which builds its ConfigMaps from them.
+  grafana:
+    profiles: [apps]
+    image: grafana/grafana:12.1.0
+    ports:
+      - "${GRAFANA_HOST_PORT:-3001}:3000"
+    depends_on:
+      - prometheus
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/infinity-mlops.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ../k8s/base/observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../k8s/base/observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../k8s/base/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
 volumes:
   kafka-data:
   postgres-data:
   minio-data:
+  prometheus-data:

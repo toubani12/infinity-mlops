@@ -1,0 +1,22 @@
+# Compose scrape targets. Kubernetes discovers pods instead: k8s/base/observability/prometheus/prometheus.yml.
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: fastapi-ml
+    static_configs:
+      - targets: ["fastapi-ml:8000"]
+
+  - job_name: agents-langgraph
+    static_configs:
+      - targets: ["agents-langgraph:8100"]
+
+  - job_name: backend-spring
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["backend-spring:8080"]
