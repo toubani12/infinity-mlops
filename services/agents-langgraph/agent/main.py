@@ -1,10 +1,12 @@
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Response
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from agent.config import Settings
@@ -32,12 +34,32 @@ async def connect_and_consume(app: FastAPI, settings: Settings, publisher: Kafka
             log.warning("kafka producer not ready: %s, retrying", exc)
             await asyncio.sleep(5)
     app.state.kafka_ready = True
-    await consume_forever(
-        settings.kafka_bootstrap_servers,
-        settings.drift_topic,
-        settings.consumer_group,
-        app.state.runs.on_drift_detected,
+    runs: RunManager = app.state.runs
+    await asyncio.gather(
+        consume_forever(
+            settings.kafka_bootstrap_servers,
+            settings.drift_topic,
+            settings.consumer_group,
+            runs.on_drift_detected,
+        ),
+        consume_forever(
+            settings.kafka_bootstrap_servers,
+            settings.commands_topic,
+            settings.consumer_group,
+            runs.on_command,
+        ),
     )
+
+
+@asynccontextmanager
+async def open_checkpointer(database_url: str) -> AsyncIterator[BaseCheckpointSaver]:
+    if not database_url:
+        log.warning("DATABASE_URL is empty, graph state lives in memory and is lost on restart")
+        yield InMemorySaver()
+        return
+    async with AsyncPostgresSaver.from_conn_string(database_url) as saver:
+        await saver.setup()
+        yield saver
 
 
 def create_app(
@@ -58,18 +80,21 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.kafka_ready = False
-        app.state.runs = RunManager(build_graph(deps, InMemorySaver()), deps)
-        task = (
-            asyncio.create_task(connect_and_consume(app, settings, publisher))
-            if connect_kafka
-            else None
-        )
-        yield
-        if task:
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
-            await publisher.stop()
+        async with open_checkpointer(settings.database_url) as checkpointer:
+            app.state.runs = RunManager(build_graph(deps, checkpointer), deps)
+            await app.state.runs.recover()
+            task = (
+                asyncio.create_task(connect_and_consume(app, settings, publisher))
+                if connect_kafka
+                else None
+            )
+            yield
+            if task:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+                await publisher.stop()
+            await app.state.runs.wait_idle()
 
     app = FastAPI(title="agents-langgraph", lifespan=lifespan)
 
