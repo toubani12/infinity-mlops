@@ -112,3 +112,76 @@ export interface DevTokenResponse {
   token: string;
   expiresAt: IsoDateTime;
 }
+
+export const AGENT_RUN_STATUSES = [
+  "RUNNING", "AWAITING_APPROVAL", "PROMOTED", "REJECTED", "KEPT_CHAMPION", "ESCALATED", "FAILED", "NOISE",
+] as const;
+export type AgentRunStatus = (typeof AGENT_RUN_STATUSES)[number];
+
+export interface PendingCommand {
+  commandId: Uuid;
+  action: "approve" | "reject";
+  actor: string;
+  reason: string | null;
+  sentAt: IsoDateTime;
+}
+
+export interface AgentRun {
+  runId: Uuid;
+  status: AgentRunStatus;
+  reportId: Uuid | null;
+  startedAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+  lastStep: string;
+  lastDecision: string | null;
+  lastMessage: string | null;
+  championVersion: string | null;
+  challengerVersion: string | null;
+  pendingCommand: PendingCommand | null;
+  decidedBy: string | null;
+  decisionReason: string | null;
+  promotedVersion: string | null;
+}
+
+export interface AgentRunEvent {
+  eventId: Uuid;
+  runId: Uuid;
+  seq: number;
+  timestamp: IsoDateTime;
+  step: string;
+  decision: string | null;
+  requiresApproval: boolean;
+  message: string | null;
+  payload: Record<string, unknown>;
+}
+
+export interface ModelMetrics {
+  version: string | null;
+  prAuc: number | null;
+  recallAtP90: number | null;
+  p95LatencyMs: number | null;
+}
+
+export interface AgentGate {
+  passed: boolean | null;
+  reasons: string[];
+  maxP95LatencyMs: number;
+}
+
+export interface AgentRunDetail {
+  run: AgentRun;
+  champion: ModelMetrics | null;
+  challenger: ModelMetrics | null;
+  gate: AgentGate;
+  events: AgentRunEvent[];
+}
+
+/** Payload of the `agent` SSE event: `event` is null when only the run changed (a decision was sent). */
+export interface AgentStreamMessage {
+  run: AgentRun;
+  event: AgentRunEvent | null;
+}
+
+export interface AgentRunListParams extends PageParams {
+  status?: AgentRunStatus;
+}

@@ -1,5 +1,8 @@
 import { apiFetch, type RequestOptions } from "./client";
 import type {
+  AgentRun,
+  AgentRunDetail,
+  AgentRunListParams,
   Alert,
   AlertListParams,
   AlertStatus,
@@ -48,4 +51,19 @@ export const modelsApi = {
 export const authApi = {
   devToken: (body: DevTokenRequest, options?: Pick<RequestOptions, "signal">) =>
     apiFetch<DevTokenResponse>("/api/auth/dev-token", { ...options, method: "POST", body }),
+};
+
+export const agentApi = {
+  runs: (params: AgentRunListParams = {}, options?: CallOptions) =>
+    apiFetch<Page<AgentRun>>("/api/agent/runs", { ...options, query: { ...params } }),
+  run: (runId: Uuid, options?: CallOptions) =>
+    apiFetch<AgentRunDetail>(`/api/agent/runs/${encodeURIComponent(runId)}`, options),
+  approve: (runId: Uuid, options?: CallOptions) =>
+    apiFetch<AgentRun>(`/api/agent/runs/${encodeURIComponent(runId)}/approve`, { ...options, method: "POST" }),
+  reject: (runId: Uuid, reason: string, options?: CallOptions) =>
+    apiFetch<AgentRun>(`/api/agent/runs/${encodeURIComponent(runId)}/reject`, {
+      ...options,
+      method: "POST",
+      body: { reason },
+    }),
 };
