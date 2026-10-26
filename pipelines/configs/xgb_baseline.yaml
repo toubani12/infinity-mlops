@@ -1,0 +1,20 @@
+experiment: fraud-xgb
+split:
+  fractions: [0.7, 0.15, 0.15]
+params:
+  n_estimators: 1500
+  max_depth: 4
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_weight: 1
+  tree_method: hist
+  eval_metric: aucpr
+  n_jobs: 4
+  random_state: 42
+early_stopping_rounds: 60
+latency_samples: 200
+max_p95_ms: 50
+synthetic:
+  rows: 284807
+  fraud_rate: 0.0017275
