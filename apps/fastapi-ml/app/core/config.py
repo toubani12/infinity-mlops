@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     fraud_threshold: float = Field(default=0.5, ge=0, le=1)
     model_retry_seconds: float = Field(default=15.0, gt=0)
 
+    kafka_enabled: bool = False
+    kafka_bootstrap_servers: str = "localhost:9092"
+    kafka_group_id: str = "fastapi-ml"
+    kafka_input_topic: str = "transaction.raw"
+    kafka_output_topic: str = "transaction.scored"
+    kafka_batch_size: int = Field(default=64, ge=1, le=1000)
+    kafka_max_wait_ms: int = Field(default=50, ge=0)
+
 
 @lru_cache
 def get_settings() -> Settings:

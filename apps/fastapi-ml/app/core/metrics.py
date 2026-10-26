@@ -13,3 +13,7 @@ FRAUD_SCORE = Histogram(
     "fraud_score", "Fraud score distribution", buckets=tuple(i / 10 for i in range(1, 11))
 )
 MODEL_RELOADS = Counter("model_reloads_total", "Model reload attempts", ["result"])
+KAFKA_MESSAGES = Counter("kafka_messages_total", "Consumed transaction.raw messages", ["result"])
+KAFKA_BATCH_SIZE = Histogram(
+    "kafka_batch_size", "Messages scored per batch", buckets=(1, 2, 4, 8, 16, 32, 64, 128, 256)
+)
