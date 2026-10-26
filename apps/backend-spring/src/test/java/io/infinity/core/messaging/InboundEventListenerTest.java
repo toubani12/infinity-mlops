@@ -12,7 +12,12 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.infinity.core.alert.ScoreIngestionService;
 import io.infinity.core.alert.ScoreUpdate;
+import io.infinity.core.modelops.DriftReport;
+import io.infinity.core.modelops.ModelOpsService;
+import io.infinity.core.modelops.ModelVersionEvent;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -21,7 +26,10 @@ class InboundEventListenerTest {
 
     private final ObjectMapper json = JsonMapper.builder().findAndAddModules().build();
     private final ScoreIngestionService scores = mock(ScoreIngestionService.class);
-    private final InboundEventListener listener = new InboundEventListener(json, scores);
+    private final ModelOpsService modelOps = mock(ModelOpsService.class);
+    private final Instant now = Instant.parse("2026-10-26T10:00:05Z");
+    private final InboundEventListener listener =
+            new InboundEventListener(json, scores, modelOps, Clock.fixed(now, ZoneOffset.UTC));
 
     @Test
     void mapsTheContractExampleToAScoreUpdate() {
@@ -53,5 +61,47 @@ class InboundEventListenerTest {
                 .hasMessageContaining("fraud_score");
 
         verify(scores, never()).apply(any());
+    }
+
+    @Test
+    void mapsTheDriftExampleToAReport() {
+        listener.onDriftDetected(ContractSchemas.example("drift.detected"));
+
+        ArgumentCaptor<DriftReport> captor = ArgumentCaptor.forClass(DriftReport.class);
+        verify(modelOps).recordDrift(captor.capture());
+        DriftReport report = captor.getValue();
+        assertThat(report.getId()).isEqualTo(UUID.fromString("1c9e6f50-2d7a-4b8e-8f3c-5a6b7c8d9e0f"));
+        assertThat(report.getWindow().rows()).isEqualTo(12000);
+        assertThat(report.getDriftShare()).isEqualTo(0.36);
+        assertThat(report.getDriftedFeatures()).containsExactly("v4", "v10", "v12", "v14", "amount");
+        assertThat(report.getQuality().referencePrAuc()).isEqualTo(0.84);
+        assertThat(report.getReceivedAt()).isEqualTo(now);
+    }
+
+    @Test
+    void rejectsDriftWithoutWindow() throws Exception {
+        ObjectNode payload = (ObjectNode) json.readTree(ContractSchemas.example("drift.detected"));
+        payload.remove("window");
+
+        assertThatThrownBy(() -> listener.onDriftDetected(payload.toString())).isInstanceOf(InvalidMessageException.class);
+        verify(modelOps, never()).recordDrift(any());
+    }
+
+    @Test
+    void mapsTheModelPromotedExample() throws Exception {
+        listener.onModelPromoted(ContractSchemas.example("model.promoted"));
+
+        ArgumentCaptor<ModelVersionEvent> captor = ArgumentCaptor.forClass(ModelVersionEvent.class);
+        verify(modelOps).recordModelVersion(captor.capture());
+        ModelVersionEvent event = captor.getValue();
+        assertThat(event.getVersion()).isEqualTo("4");
+        assertThat(event.getPreviousVersion()).isEqualTo("3");
+        assertThat(event.getReason()).isEqualTo("promotion");
+        assertThat(event.getRunId()).isNotNull();
+
+        ObjectNode noVersion = (ObjectNode) json.readTree(ContractSchemas.example("model.promoted"));
+        noVersion.remove("version");
+        assertThatThrownBy(() -> listener.onModelPromoted(noVersion.toString()))
+                .isInstanceOf(InvalidMessageException.class);
     }
 }
