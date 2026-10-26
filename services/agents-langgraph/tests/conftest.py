@@ -11,6 +11,7 @@ from agent.config import Settings
 from agent.deps import AgentDeps
 from agent.events import EventEmitter
 from agent.graph import build_graph
+from agent.runs import RunManager
 from agent.tools import Toolset
 from agent.tools.approval import EventApprovalRequester
 from agent.tools.report import PayloadReportReader
@@ -44,6 +45,9 @@ class Harness:
 
     def graph(self):
         return build_graph(self.deps, self.checkpointer)
+
+    def manager(self) -> RunManager:
+        return RunManager(self.graph(), self.deps)
 
     def assert_events_match_contract(self) -> None:
         events = validator("agent.events")
