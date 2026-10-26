@@ -6,6 +6,9 @@ import static org.awaitility.Awaitility.await;
 import io.infinity.core.alert.AlertStatus;
 import io.infinity.core.alert.ScoreIngestionService;
 import io.infinity.core.alert.ScoreUpdate;
+import io.infinity.core.modelops.AgentRunFixtures;
+import io.infinity.core.modelops.AgentRunService;
+import io.infinity.core.modelops.AgentStep;
 import io.infinity.core.security.Role;
 import io.infinity.core.security.TokenService;
 import io.infinity.core.transaction.Transaction;
@@ -19,6 +22,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +49,9 @@ class StreamIntegrationTest {
 
     @Autowired
     private ScoreIngestionService scores;
+
+    @Autowired
+    private AgentRunService agentRuns;
 
     @Autowired
     private SseBroadcaster broadcaster;
@@ -85,6 +92,20 @@ class StreamIntegrationTest {
         assertThat(alertEvent).contains("event:alert");
         assertThat(dataOf(alertEvent))
                 .contains("\"transactionId\":\"" + created.getId() + "\"", "\"status\":\"" + AlertStatus.OPEN + "\"");
+    }
+
+    @Test
+    void streamsAgentStepsWithTheRunStatus() throws Exception {
+        BlockingQueue<String> lines = subscribe("/api/stream/agent", tokens.issue("ana", Role.ANALYST).token());
+        await().atMost(Duration.ofSeconds(5)).until(() -> broadcaster.subscriberCount(StreamChannel.AGENT) == 1);
+
+        UUID runId = UUID.randomUUID();
+        agentRuns.record(AgentRunFixtures.step(runId, 0, AgentStep.RECEIVED, null, "{\"drift_share\":0.36}"));
+
+        List<String> event = nextEvent(lines);
+        assertThat(event).contains("event:agent");
+        assertThat(dataOf(event)).contains("\"runId\":\"" + runId + "\"", "\"status\":\"RUNNING\"",
+                "\"step\":\"received\"", "\"payload\":{\"drift_share\":0.36}");
     }
 
     private BlockingQueue<String> subscribe(String path, String token) throws Exception {

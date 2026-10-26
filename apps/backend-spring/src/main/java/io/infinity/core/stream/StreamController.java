@@ -25,4 +25,9 @@ public class StreamController {
     public SseEmitter alerts() {
         return broadcaster.subscribe(StreamChannel.ALERTS);
     }
+
+    @GetMapping("/agent")
+    public SseEmitter agent() {
+        return broadcaster.subscribe(StreamChannel.AGENT);
+    }
 }
