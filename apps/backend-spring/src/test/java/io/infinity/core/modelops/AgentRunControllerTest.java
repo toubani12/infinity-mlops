@@ -1,10 +1,17 @@
 package io.infinity.core.modelops;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.infinity.core.config.ConflictException;
 import io.infinity.core.security.Role;
 import io.infinity.core.security.TokenService;
 import java.util.List;
@@ -15,6 +22,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -72,6 +80,49 @@ class AgentRunControllerTest {
     @Test
     void refusesAnonymousReaders() throws Exception {
         mvc.perform(get("/api/agent/runs")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void letsOnlyAdminsDecideWithTheirOwnName() throws Exception {
+        when(service.decide(eq(RUN_ID), any(), any(), any())).thenReturn(waitingRun());
+
+        mvc.perform(as(post("/api/agent/runs/" + RUN_ID + "/approve"), Role.ANALYST))
+                .andExpect(status().isForbidden());
+        mvc.perform(as(post("/api/agent/runs/" + RUN_ID + "/approve"), Role.ADMIN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runId").value(RUN_ID.toString()));
+        verify(service).decide(eq(RUN_ID), eq(AgentCommand.Action.APPROVE), eq("badr"), isNull());
+
+        mvc.perform(as(post("/api/agent/runs/" + RUN_ID + "/reject"), Role.ADMIN)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"  recall gain too small \"}"))
+                .andExpect(status().isOk());
+        verify(service).decide(RUN_ID, AgentCommand.Action.REJECT, "badr", "recall gain too small");
+    }
+
+    @Test
+    void requiresAReasonOfThreeCharactersToReject() throws Exception {
+        for (String body : List.of("{}", "{\"reason\":\"  no \"}", "{\"reason\":null}")) {
+            mvc.perform(as(post("/api/agent/runs/" + RUN_ID + "/reject"), Role.ADMIN)
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors.reason").exists());
+        }
+        verify(service, never()).decide(any(), any(), any(), any());
+    }
+
+    @Test
+    void reportsConflictsAndDeliveryFailures() throws Exception {
+        when(service.decide(eq(RUN_ID), eq(AgentCommand.Action.APPROVE), any(), any()))
+                .thenThrow(new ConflictException("Run is PROMOTED, not awaiting approval"));
+        when(service.decide(eq(RUN_ID), eq(AgentCommand.Action.REJECT), any(), any()))
+                .thenThrow(new CommandNotSentException(new IllegalStateException("broker down")));
+
+        mvc.perform(as(post("/api/agent/runs/" + RUN_ID + "/approve"), Role.ADMIN))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Run is PROMOTED, not awaiting approval"));
+        mvc.perform(as(post("/api/agent/runs/" + RUN_ID + "/reject"), Role.ADMIN)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"not now\"}"))
+                .andExpect(status().isServiceUnavailable());
     }
 
     private MockHttpServletRequestBuilder as(MockHttpServletRequestBuilder request, Role role) {

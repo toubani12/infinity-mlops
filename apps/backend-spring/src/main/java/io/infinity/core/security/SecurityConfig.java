@@ -40,6 +40,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/dev-token").permitAll()
                         .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/agent/runs/*/approve", "/api/agent/runs/*/reject")
+                        .hasRole("ADMIN")
                         .requestMatchers("/api/**").access(analyst)
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(server -> server
