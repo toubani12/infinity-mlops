@@ -1,0 +1,126 @@
+openapi: 3.1.0
+info:
+  title: fastapi-ml inference
+  version: 1.0.0
+  description: Synchronous scoring and model management for the fraud model.
+paths:
+  /predict:
+    post:
+      operationId: predict
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PredictRequest"
+      responses:
+        "200":
+          description: Scored transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictResponse"
+        "422":
+          description: Missing or invalid features
+        "503":
+          description: No champion model loaded
+  /model:
+    get:
+      operationId: currentModel
+      responses:
+        "200":
+          description: Model currently served
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelInfo"
+  /model/reload:
+    post:
+      operationId: reloadModel
+      description: Loads the version behind the champion alias and swaps it in without dropping requests.
+      responses:
+        "200":
+          description: Model after reload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelInfo"
+        "503":
+          description: Registry unreachable, previous model kept
+  /health:
+    get:
+      operationId: health
+      responses:
+        "200":
+          description: Liveness and readiness
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, model_loaded]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, degraded]
+                  model_loaded:
+                    type: boolean
+components:
+  schemas:
+    PredictRequest:
+      type: object
+      required: [transaction_id, amount, features]
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        amount:
+          type: number
+          minimum: 0
+        features:
+          type: object
+          description: V1 to V28 PCA components, all required.
+          additionalProperties:
+            type: number
+          propertyNames:
+            pattern: "^v([1-9]|1[0-9]|2[0-8])$"
+          minProperties: 28
+          maxProperties: 28
+    PredictResponse:
+      type: object
+      required: [transaction_id, fraud_score, is_fraud, threshold, model_version, latency_ms]
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        fraud_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        is_fraud:
+          type: boolean
+        threshold:
+          type: number
+        model_name:
+          type: string
+        model_version:
+          type: string
+        latency_ms:
+          type: number
+    ModelInfo:
+      type: object
+      required: [model_name, version, alias]
+      properties:
+        model_name:
+          type: string
+        version:
+          type: string
+        alias:
+          type: string
+        loaded_at:
+          type: string
+          format: date-time
+        threshold:
+          type: number
