@@ -1,0 +1,10 @@
+{
+  "transaction_id": "7f8d4c2e-1b3a-4e5f-9a6b-0c1d2e3f4a5b",
+  "timestamp": "2026-10-26T09:15:00.041Z",
+  "fraud_score": 0.0123,
+  "is_fraud": false,
+  "threshold": 0.5,
+  "model_name": "fraud-xgb",
+  "model_version": "3",
+  "latency_ms": 4.2
+}
