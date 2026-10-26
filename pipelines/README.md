@@ -48,6 +48,14 @@ stopping; the split raises `ValueError` if any training row reaches into the tes
 test metrics are always measured on data strictly later than everything the model learned from.
 `Split.summary()` reports rows, frauds, fraud rate and time range per block.
 
+## Model card and decision threshold
+
+Every training run picks the decision threshold with the highest recall at 90 % precision on the
+validation block (`training/threshold.py`), logs it as the metric `decision_threshold` and the
+version tag of the same name, and attaches `model_card.md` to the run: data window, split,
+metrics against the champion, gate result, threshold, parameters and known limitations.
+fastapi-ml applies the tagged threshold when `FRAUD_THRESHOLD=auto`.
+
 ## Training
 
 ```bash
