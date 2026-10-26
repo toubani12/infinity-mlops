@@ -6,9 +6,13 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "boto3>=1.43.118",
+    "mlflow==3.17.2",
     "numpy>=2.5.4",
-    "pandas>=3.1.0",
-    "pyarrow>=26.0.0",
+    "pandas>=2.2",
+    "pyarrow>=21",
+    "pyyaml>=6.0.3",
+    "scikit-learn>=1.9.1",
+    "xgboost-cpu==3.4.1",
 ]
 
 [dependency-groups]
@@ -31,4 +35,4 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
-addopts = "--cov=data --cov=training --cov-report=term-missing"
+addopts = "--cov=data --cov=training --cov=registry --cov-report=term-missing"
