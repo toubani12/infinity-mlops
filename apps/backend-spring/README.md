@@ -1,0 +1,43 @@
+# backend-spring
+
+Business entry point of Infinity MLOps. It stores incoming transactions, serves them to the dashboard and keeps the fraud alerts raised from the model scores.
+
+Spring Boot 3.5, Java 21, PostgreSQL with Flyway, Actuator with Prometheus metrics.
+
+## API
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/api/transactions` | body `{ transactionId?, timestamp?, amount, features: { v1..v28 }, label? }`, returns 201 |
+| GET | `/api/transactions/{id}` | |
+| GET | `/api/transactions?page&size&fraudOnly` | newest first, `size` ≤ 200 |
+| GET | `/api/alerts?page&size&status` | `status` in `OPEN`, `ACKNOWLEDGED`, `CLOSED` |
+| PATCH | `/api/alerts/{id}` | body `{ "status": "ACKNOWLEDGED" }` |
+| GET | `/actuator/health`, `/actuator/prometheus` | |
+
+REST bodies use camelCase. Kafka payloads follow `libs/contracts` (snake_case). Lists return `{ content, page, size, totalElements, totalPages }`. Errors are RFC 9457 problem details (`application/problem+json`); validation errors add an `errors` map keyed by field.
+
+The server generates `transactionId` and `timestamp` when they are absent; a duplicate `transactionId` returns 409. Alert status only moves forward (`OPEN` → `ACKNOWLEDGED` → `CLOSED`); going back returns 409.
+
+## Storage
+
+`transactions.features` is a single `double precision[]` column of 28 values in `v1`..`v28` order, with a `CHECK (cardinality(features) = 28)`. The vector is always read and written as a whole, never queried per feature, so one array column keeps the row compact (no 28 columns, no JSONB key overhead) and maps directly to the model input order. The JSON map form is rebuilt at the API boundary (`Features`).
+
+`received_at` is set by the server and drives the default ordering, so replayed transactions with old `timestamp` values still show up first in the live views. Scoring fields (`fraud_score`, `is_fraud`, `model_version`, `scored_at`) stay null until `transaction.scored` arrives.
+
+## Configuration
+
+| Variable | Default |
+|---|---|
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/infinity` |
+| `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `infinity` / `infinity` |
+
+## Run and test
+
+```bash
+mvn spring-boot:run     # needs the PostgreSQL of infra/docker-compose.yml
+mvn -B verify           # unit and slice tests on H2 (PostgreSQL mode), JaCoCo report in target/site/jacoco
+docker build -t backend-spring .
+```
+
+The migrations only use SQL accepted by both PostgreSQL and H2, so the `@DataJpaTest` slices run the real Flyway scripts without Docker.
