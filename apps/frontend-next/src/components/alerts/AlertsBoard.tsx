@@ -24,6 +24,7 @@ export function AlertsBoard() {
   const [loaded, setLoaded] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     if (!token) {
@@ -34,6 +35,7 @@ export function AlertsBoard() {
       .list({ status: filter === "ALL" ? undefined : filter, size: 100 }, { token, signal: controller.signal })
       .then((page) => {
         setAlerts(page.content);
+        setError(null);
         setLoaded(true);
       })
       .catch((e: unknown) => {
@@ -41,20 +43,23 @@ export function AlertsBoard() {
           return;
         }
         if (e instanceof ApiError && e.status === 401) {
-          signOut();
+          signOut("expired");
           return;
         }
         setError(e instanceof Error ? e.message : "Could not load alerts.");
         setLoaded(true);
       });
     return () => controller.abort();
-  }, [token, filter, signOut]);
+  }, [token, filter, signOut, reloads]);
 
   const stream = useEventStream<Alert>({
     path: "/api/stream/alerts",
     event: "alert",
     token,
+    expiresAt: session?.expiresAt,
     onEvent: (alert) => setAlerts((current) => applyAlertChange(current, alert, filter)),
+    onReconnect: () => setReloads((n) => n + 1),
+    onUnauthorized: () => signOut("expired"),
   });
 
   async function changeStatus(alert: Alert, status: AlertStatus) {

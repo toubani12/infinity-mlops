@@ -6,7 +6,13 @@ import { StreamIndicator } from "@/components/StreamIndicator";
 import { useEventStream } from "@/hooks/useEventStream";
 import { ApiError, transactionsApi, type Transaction } from "@/lib/api";
 import { useSession } from "@/lib/auth";
-import { DEFAULT_FILTERS, matchesFilters, upsertTransaction, type TransactionFilters } from "@/lib/transactions";
+import {
+  DEFAULT_FILTERS,
+  matchesFilters,
+  mergeTransactions,
+  upsertTransaction,
+  type TransactionFilters,
+} from "@/lib/transactions";
 import { TransactionFiltersBar } from "./TransactionFiltersBar";
 import { TransactionTable } from "./TransactionTable";
 
@@ -38,7 +44,7 @@ export function LiveTransactions() {
           return;
         }
         if (e instanceof ApiError && e.status === 401) {
-          signOut();
+          signOut("expired");
           return;
         }
         setError(e instanceof Error ? e.message : "Could not load transactions.");
@@ -47,11 +53,24 @@ export function LiveTransactions() {
     return () => controller.abort();
   }, [token, filters.fraudOnly, signOut]);
 
+  function reloadMissed() {
+    if (!token) {
+      return;
+    }
+    transactionsApi
+      .list({ fraudOnly: filters.fraudOnly || undefined, size: PAGE_SIZE }, { token })
+      .then((page) => setRows((current) => mergeTransactions(page.content, current, MAX_ROWS)))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Could not reload transactions."));
+  }
+
   const stream = useEventStream<Transaction>({
     path: "/api/stream/transactions",
     event: "transaction",
     token,
+    expiresAt: session?.expiresAt,
     onEvent: (transaction) => setRows((current) => upsertTransaction(current, transaction, MAX_ROWS)),
+    onReconnect: reloadMissed,
+    onUnauthorized: () => signOut("expired"),
   });
 
   const visible = rows.filter((row) => matchesFilters(row, filters));

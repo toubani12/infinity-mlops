@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { transaction } from "@/test/fixtures";
 import { formatAmount, formatTime, formatWhen, riskBand, shortId } from "./format";
-import { DEFAULT_FILTERS, matchesFilters, upsertTransaction } from "./transactions";
+import { DEFAULT_FILTERS, matchesFilters, mergeTransactions, upsertTransaction } from "./transactions";
 
 describe("transaction filters", () => {
   const fraud = transaction({ transactionId: "aaaa1111-0000", fraudScore: 0.91, isFraud: true });
@@ -37,5 +37,23 @@ describe("format", () => {
     expect(formatWhen("2026-10-20T09:15:07Z", new Date("2026-10-26T12:00:00Z"))).toMatch(/^on 20 Oct/);
     expect(formatWhen("2026-10-26T09:15:07Z", new Date("2026-10-26T12:00:00Z"))).toMatch(/^at /);
     expect([riskBand(0.9), riskBand(0.3), riskBand(0.1)]).toEqual(["high", "elevated", "low"]);
+  });
+});
+
+describe("mergeTransactions", () => {
+  it("adds missed rows, refreshes known ones and keeps the newest first", () => {
+    const live = [
+      transaction({ transactionId: "c", receivedAt: "2026-10-26T10:00:03Z", fraudScore: null }),
+      transaction({ transactionId: "a", receivedAt: "2026-10-26T10:00:01Z" }),
+    ];
+    const latest = [
+      transaction({ transactionId: "c", receivedAt: "2026-10-26T10:00:03Z", fraudScore: 0.9 }),
+      transaction({ transactionId: "b", receivedAt: "2026-10-26T10:00:02Z" }),
+    ];
+
+    const merged = mergeTransactions(latest, live, 10);
+    expect(merged.map((t) => t.transactionId)).toEqual(["c", "b", "a"]);
+    expect(merged[0].fraudScore).toBe(0.9);
+    expect(mergeTransactions(latest, live, 2).map((t) => t.transactionId)).toEqual(["c", "b"]);
   });
 });

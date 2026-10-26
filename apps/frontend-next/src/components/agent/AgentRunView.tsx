@@ -44,7 +44,7 @@ export function AgentRunView() {
             return;
           }
           if (e instanceof ApiError && e.status === 401) {
-            signOut();
+            signOut("expired");
             return;
           }
           setLoad({
@@ -67,7 +67,10 @@ export function AgentRunView() {
     path: "/api/stream/agent",
     event: "agent",
     token,
+    expiresAt: session?.expiresAt,
     onEvent: (message) => setLoad((current) => updateDetail(current, (detail) => applyToDetail(detail, message))),
+    onReconnect: () => fetchDetail(),
+    onUnauthorized: () => signOut("expired"),
   });
 
   async function decide(action: "approve" | "reject", reason: string | null): Promise<boolean> {
@@ -85,7 +88,7 @@ export function AgentRunView() {
       return true;
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
-        signOut();
+        signOut("expired");
         return false;
       }
       if (e instanceof ApiError && e.status === 409) {

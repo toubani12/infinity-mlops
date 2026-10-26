@@ -19,6 +19,14 @@ export function matchesFilters(transaction: Transaction, filters: TransactionFil
   return query === "" || transaction.transactionId.toLowerCase().includes(query);
 }
 
+/** Merges a freshly loaded page into the live rows, newest first, without duplicates. */
+export function mergeTransactions(latest: Transaction[], rows: Transaction[], limit: number): Transaction[] {
+  const ids = new Set(latest.map((row) => row.transactionId));
+  return [...latest, ...rows.filter((row) => !ids.has(row.transactionId))]
+    .sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt))
+    .slice(0, limit);
+}
+
 export function upsertTransaction(rows: Transaction[], incoming: Transaction, limit: number): Transaction[] {
   const rest = rows.filter((row) => row.transactionId !== incoming.transactionId);
   return [incoming, ...rest].slice(0, limit);

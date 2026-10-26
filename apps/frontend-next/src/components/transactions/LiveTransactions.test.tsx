@@ -86,4 +86,46 @@ describe("LiveTransactions", () => {
 
     await vi.waitFor(() => expect(window.sessionStorage.getItem("infinity.session")).toBeNull());
   });
+
+  it("reloads the latest page after a reconnect so missed rows appear", async () => {
+    const pages = [
+      page([transaction({ transactionId: "aaaa0000-1" })]),
+      page([
+        transaction({ transactionId: "bbbb0000-2", receivedAt: "2026-10-26T09:16:00Z" }),
+        transaction({ transactionId: "aaaa0000-1" }),
+      ]),
+    ];
+    fetchMock.mockImplementation(async (input) =>
+      String(input).includes("/api/stream/") ? new Response(null, { status: 200 }) : jsonResponse(pages.shift()),
+    );
+    renderLive();
+    await screen.findByText("aaaa0000");
+
+    act(() => {
+      FakeEventSource.latest().open();
+      FakeEventSource.latest().fail();
+    });
+    expect(screen.getByText(/Reconnecting in/)).toBeInTheDocument();
+    await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(2), { timeout: 3000 });
+    act(() => FakeEventSource.latest().open());
+
+    expect(await screen.findByText("bbbb0000")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/api/transactions?size=100"))).toHaveLength(2);
+    expect(screen.getAllByRole("row")).toHaveLength(3);
+  });
+
+  it("signs out with an expiry notice when the stream token is rejected", async () => {
+    fetchMock.mockImplementation(async (input) =>
+      String(input).includes("/api/stream/")
+        ? new Response(null, { status: 401 })
+        : jsonResponse(page([transaction()])),
+    );
+    renderLive();
+    await screen.findByText("7f8d4c2e");
+
+    act(() => FakeEventSource.latest().fail());
+
+    await vi.waitFor(() => expect(window.sessionStorage.getItem("infinity.session")).toBeNull());
+    expect(window.sessionStorage.getItem("infinity.signout")).toBe("expired");
+  });
 });

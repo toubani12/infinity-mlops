@@ -26,6 +26,7 @@ export function AgentRuns() {
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     if (!token) {
@@ -36,6 +37,7 @@ export function AgentRuns() {
       .runs({ size: 50 }, { token, signal: controller.signal })
       .then((page) => {
         setRuns(page.content);
+        setError(null);
         setLoaded(true);
       })
       .catch((e: unknown) => {
@@ -43,20 +45,23 @@ export function AgentRuns() {
           return;
         }
         if (e instanceof ApiError && e.status === 401) {
-          signOut();
+          signOut("expired");
           return;
         }
         setError(e instanceof Error ? e.message : "Could not load agent runs.");
         setLoaded(true);
       });
     return () => controller.abort();
-  }, [token, signOut]);
+  }, [token, signOut, reloads]);
 
   const stream = useEventStream<AgentStreamMessage>({
     path: "/api/stream/agent",
     event: "agent",
     token,
+    expiresAt: session?.expiresAt,
     onEvent: (message) => setRuns((current) => upsertRun(current, message.run)),
+    onReconnect: () => setReloads((n) => n + 1),
+    onUnauthorized: () => signOut("expired"),
   });
 
   const waiting = runs.filter((run) => run.status === "AWAITING_APPROVAL").length;
