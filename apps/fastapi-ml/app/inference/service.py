@@ -21,6 +21,7 @@ class Transaction:
     transaction_id: str
     timestamp: datetime
     features: dict[str, float]
+    label: int | None = None
 
 
 @dataclass(frozen=True)
