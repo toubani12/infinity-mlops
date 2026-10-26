@@ -8,6 +8,9 @@ export interface Session {
 }
 
 const STORAGE_KEY = "infinity.session";
+const SIGN_OUT_KEY = "infinity.signout";
+
+export type SignOutReason = "expired";
 
 export function isExpired(session: Session, now: number = Date.now()): boolean {
   return Date.parse(session.expiresAt) <= now;
@@ -35,6 +38,26 @@ export function saveSession(session: Session): void {
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   } catch {
     // Storage can be blocked (private mode); the in-memory session still works for this tab.
+  }
+}
+
+export function saveSignOutReason(reason: SignOutReason | null): void {
+  try {
+    if (reason) {
+      window.sessionStorage.setItem(SIGN_OUT_KEY, reason);
+    } else {
+      window.sessionStorage.removeItem(SIGN_OUT_KEY);
+    }
+  } catch {
+    // Without storage the login page simply shows no notice.
+  }
+}
+
+export function loadSignOutReason(): SignOutReason | null {
+  try {
+    return window.sessionStorage.getItem(SIGN_OUT_KEY) === "expired" ? "expired" : null;
+  } catch {
+    return null;
   }
 }
 

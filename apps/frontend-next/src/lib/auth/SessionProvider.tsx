@@ -1,15 +1,25 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { authApi, type Role } from "@/lib/api";
-import { clearSession, loadSession, saveSession, type Session } from "./session";
+import { clearSession, loadSession, saveSession, saveSignOutReason, type Session, type SignOutReason } from "./session";
 
 interface SessionContextValue {
   session: Session | null;
   ready: boolean;
   signIn: (username: string, role: Role) => Promise<Session>;
-  signOut: () => void;
+  signOut: (reason?: SignOutReason) => void;
 }
+
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
@@ -50,18 +60,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const issued = await authApi.devToken({ username, role });
     const session: Session = { token: issued.token, expiresAt: issued.expiresAt, username, role };
     saveSession(session);
+    saveSignOutReason(null);
     setSnapshot(session);
     return session;
   }, []);
 
-  const signOut = useCallback(() => {
+  const signOut = useCallback((reason?: SignOutReason) => {
     clearSession();
+    saveSignOutReason(reason ?? null);
     setSnapshot(null);
   }, []);
 
+  const session = current?.session ?? null;
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    const remaining = Date.parse(session.expiresAt) - Date.now();
+    const timer = setTimeout(() => signOut("expired"), Math.min(Math.max(remaining, 0), MAX_TIMEOUT_MS));
+    return () => clearTimeout(timer);
+  }, [session, signOut]);
+
   const value = useMemo<SessionContextValue>(
-    () => ({ session: current?.session ?? null, ready: current !== null, signIn, signOut }),
-    [current, signIn, signOut],
+    () => ({ session, ready: current !== null, signIn, signOut }),
+    [session, current, signIn, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

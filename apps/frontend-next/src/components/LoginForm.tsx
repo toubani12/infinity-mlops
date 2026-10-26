@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { ApiError, type Role } from "@/lib/api";
-import { useSession } from "@/lib/auth";
+import { loadSignOutReason, useSession } from "@/lib/auth";
+
+const noSubscription = () => () => {};
 
 export function LoginForm() {
   const { signIn } = useSession();
@@ -12,6 +14,7 @@ export function LoginForm() {
   const [role, setRole] = useState<Role>("analyst");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const signOutReason = useSyncExternalStore(noSubscription, loadSignOutReason, () => null);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,6 +70,11 @@ export function LoginForm() {
           </label>
         ))}
       </fieldset>
+      {signOutReason === "expired" && !error ? (
+        <p role="status" className="rounded-md bg-caution-soft px-3 py-2 text-sm text-caution">
+          Your session expired. Sign in again to continue.
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" className="rounded-md bg-risk-soft px-3 py-2 text-sm text-risk">
           {error}

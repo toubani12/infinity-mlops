@@ -31,7 +31,7 @@ export function useApiResource<T>(
           return;
         }
         if (e instanceof ApiError && e.status === 401) {
-          signOut();
+          signOut("expired");
           return;
         }
         const status = e instanceof ApiError ? e.status : null;

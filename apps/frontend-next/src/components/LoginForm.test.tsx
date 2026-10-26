@@ -60,4 +60,15 @@ describe("LoginForm", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("local profile");
     expect(replace).not.toHaveBeenCalled();
   });
+
+  it("tells the user when the previous session expired and forgets it after sign in", async () => {
+    window.sessionStorage.setItem("infinity.signout", "expired");
+    fetchMock.mockResolvedValue(jsonResponse({ token: "jwt", expiresAt: "2099-01-01T00:00:00Z" }));
+    renderForm();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Your session expired");
+    await userEvent.type(screen.getByLabelText("Username"), "ana");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(window.sessionStorage.getItem("infinity.signout")).toBeNull();
+  });
 });
