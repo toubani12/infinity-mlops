@@ -203,7 +203,7 @@ def test_retrain_logs_champion_metrics_and_gate(retrained) -> None:
         run.data.metrics
     )
     assert run.data.tags["gate_passed"] == str(retrained.training.gate.passed).lower()
-    assert run.data.tags["gate_reasons"] == "; ".join(retrained.training.gate.reasons)
+    assert run.data.tags["gate_reasons"] == retrained.training.gate.summary()
     assert run.data.tags["eval_slice"] == "recent"
     assert retrained.training.champion_version == "1"
 
@@ -228,6 +228,35 @@ def test_main_exits_zero_and_prints_the_outcome(tracking, tmp_path, monkeypatch,
     assert out["run_id"] == "run-cli" and out["version"] == "1"
     assert out["eval_slice"] == "holdout" and out["labeled_rows"] == 0
     assert out["gate_passed"] is True and out["champion_version"] is None
+
+
+def test_gate_rejects_a_worse_challenger_without_failing_the_job(
+    tracking, raw_frame, tmp_path, monkeypatch, capsys
+) -> None:
+    name = "fraud-xgb-retrain-worse"
+    monkeypatch.setenv("MODEL_NAME", name)
+    monkeypatch.setenv("REFERENCE_ROOT", str(tmp_path / "reference"))
+    train(raw_frame, config(name), bootstrap=True)
+    data = tmp_path / "creditcard.csv"
+    raw_frame.to_csv(data, index=False)
+    weak = {"n_estimators": 1, "max_depth": 1, "learning_rate": 0.01, "eval_metric": "aucpr"}
+    config_file = tmp_path / "weak.yaml"
+    config_file.write_text(
+        json.dumps({"experiment": "fraud-xgb-test", "params": weak, "latency_samples": 5})
+    )
+    env = {"RUN_ID": "run-worse", "TRAIN_CONFIG": str(config_file), "DATA_URI": str(data)}
+    assert retrain_module.main(env | {"PREDICTIONS_URI": str(tmp_path / "none")}) == 0
+
+    out = json.loads(capsys.readouterr().out)
+    assert out["gate_passed"] is False and out["champion_version"] == "1"
+    assert any("is not above champion" in reason for reason in out["gate_reasons"])
+    client = MlflowClient()
+    version = client.get_model_version(name, out["version"])
+    tags = client.get_run(version.run_id).data.tags
+    assert tags["gate_passed"] == "false"
+    assert "is not above champion" in tags["gate_reasons"]
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
+    assert str(client.get_model_version_by_alias(name, "challenger").version) == "2"
 
 
 def test_main_fails_on_technical_errors(tmp_path) -> None:
