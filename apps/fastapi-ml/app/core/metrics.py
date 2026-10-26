@@ -17,3 +17,6 @@ KAFKA_MESSAGES = Counter("kafka_messages_total", "Consumed transaction.raw messa
 KAFKA_BATCH_SIZE = Histogram(
     "kafka_batch_size", "Messages scored per batch", buckets=(1, 2, 4, 8, 16, 32, 64, 128, 256)
 )
+PREDICTION_LOG_ROWS = Counter(
+    "prediction_log_rows_total", "Prediction log rows by outcome", ["result"]
+)
