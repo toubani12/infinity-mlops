@@ -39,6 +39,7 @@ infinity:
     threshold: ${ALERT_THRESHOLD:0.5}
   agent:
     max-p95-latency-ms: ${MAX_P95_LATENCY_MS:50}
+    command-timeout: 5s
   outbox:
     enabled: true
     batch-size: 500
