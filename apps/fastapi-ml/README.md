@@ -74,7 +74,7 @@ filesystem implementation.
 | `MLFLOW_TRACKING_URI` | `http://localhost:5000` |
 | `MODEL_NAME` | `fraud-xgb` |
 | `MODEL_ALIAS` | `champion` |
-| `FRAUD_THRESHOLD` | `0.5` |
+| `FRAUD_THRESHOLD` | `0.5`; `auto` uses the `decision_threshold` tag of the served version (highest recall at 90 % precision on validation), 0.5 if the tag is missing |
 | `MODEL_RETRY_SECONDS` | `15` |
 | `PREDICTION_LOG_ENABLED` | `true` |
 | `PREDICTION_LOG_URI` | `s3://predictions` (a local directory works too) |

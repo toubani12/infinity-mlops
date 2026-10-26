@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Annotated, Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,7 +11,7 @@ class Settings(BaseSettings):
     model_name: str = "fraud-xgb"
     model_alias: str = "champion"
     mlflow_tracking_uri: str = "http://localhost:5000"
-    fraud_threshold: float = Field(default=0.5, ge=0, le=1)
+    fraud_threshold: Literal["auto"] | Annotated[float, Field(ge=0, le=1)] = 0.5
     model_retry_seconds: float = Field(default=15.0, gt=0)
 
     prediction_log_enabled: bool = True

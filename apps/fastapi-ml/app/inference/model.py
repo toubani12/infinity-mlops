@@ -20,6 +20,7 @@ class LoadedModel:
     alias: str
     predictor: Predictor
     loaded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    threshold: float | None = None
 
 
 class ModelLoader(Protocol):
@@ -39,6 +40,14 @@ class MlflowModelLoader:
 
         mlflow.set_tracking_uri(self._tracking_uri)
         client = mlflow.MlflowClient(tracking_uri=self._tracking_uri)
-        version = str(client.get_model_version_by_alias(name, alias).version)
+        model_version = client.get_model_version_by_alias(name, alias)
+        version = str(model_version.version)
+        tag = (model_version.tags or {}).get("decision_threshold")
         predictor: Any = mlflow.xgboost.load_model(f"models:/{name}/{version}")
-        return LoadedModel(name=name, version=version, alias=alias, predictor=predictor)
+        return LoadedModel(
+            name=name,
+            version=version,
+            alias=alias,
+            predictor=predictor,
+            threshold=float(tag) if tag else None,
+        )

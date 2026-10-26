@@ -98,7 +98,7 @@ def create_app(
         loader or MlflowModelLoader(settings.mlflow_tracking_uri),
         settings.model_name,
         settings.model_alias,
-        settings.fraud_threshold,
+        None if settings.fraud_threshold == "auto" else settings.fraud_threshold,
         sink=app.state.prediction_log.add if app.state.prediction_log else None,
     )
     app.include_router(router)

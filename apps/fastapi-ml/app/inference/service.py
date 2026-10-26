@@ -13,6 +13,8 @@ from app.inference.model import FEATURES, LoadedModel, ModelLoader
 
 log = logging.getLogger(__name__)
 
+DEFAULT_THRESHOLD = 0.5
+
 
 class ModelUnavailableError(RuntimeError):
     pass
@@ -44,14 +46,14 @@ class InferenceService:
         loader: ModelLoader,
         name: str,
         alias: str,
-        threshold: float,
+        threshold: float | None,
         sink: Callable[[list["Transaction"], list["Score"]], None] | None = None,
     ) -> None:
         self._loader = loader
         self._sink = sink
         self._name = name
         self._alias = alias
-        self.threshold = threshold
+        self._fixed_threshold = threshold
         self._model: LoadedModel | None = None
         self._reload_lock = asyncio.Lock()
         self.last_reload_error: str | None = None
@@ -59,6 +61,14 @@ class InferenceService:
     @property
     def model(self) -> LoadedModel | None:
         return self._model
+
+    @property
+    def threshold(self) -> float:
+        if self._fixed_threshold is not None:
+            return self._fixed_threshold
+        if self._model is not None and self._model.threshold is not None:
+            return self._model.threshold
+        return DEFAULT_THRESHOLD
 
     async def reload(self) -> LoadedModel:
         """Load the aliased version next to the current one and swap only on success."""
@@ -92,6 +102,7 @@ class InferenceService:
         model = self._model
         if model is None:
             raise ModelUnavailableError("no model loaded")
+        threshold = self.threshold
         started = time.perf_counter()
         frame = pd.DataFrame([t.features for t in transactions], columns=FEATURES)
         scores = model.predictor.predict_proba(frame)[:, 1]
@@ -99,7 +110,7 @@ class InferenceService:
         results = []
         for transaction, value in zip(transactions, scores, strict=True):
             fraud_score = float(value)
-            is_fraud = fraud_score >= self.threshold
+            is_fraud = fraud_score >= threshold
             FRAUD_SCORE.observe(fraud_score)
             PREDICTIONS.labels(source, "fraud" if is_fraud else "legit", model.version).inc()
             results.append(
@@ -108,7 +119,7 @@ class InferenceService:
                     timestamp=transaction.timestamp,
                     fraud_score=fraud_score,
                     is_fraud=is_fraud,
-                    threshold=self.threshold,
+                    threshold=threshold,
                     model_name=model.name,
                     model_version=model.version,
                     latency_ms=latency_ms,
