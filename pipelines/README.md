@@ -70,7 +70,7 @@ One run:
 4. when a champion exists, evaluates it on the same test block, logs `champion_pr_auc`,
    `champion_recall_at_p90`, `champion_p95_latency_ms` and the `gate_passed` tag
    (`training.evaluate.compare`: PR-AUC and recall at 90 % precision both at least the champion's,
-   p95 under 50 ms);
+   p95 under 50 ms) with the `gate_reasons` tag (reasons joined by `; `);
 5. logs params, metrics, `evaluation.json` (split summary, gate reasons) and the model
    (`mlflow.xgboost`), registers it as `fraud-xgb` (`MODEL_NAME`) and sets `@challenger`;
 6. writes the reference sample (test block with `fraud_score`, `label`, `model_version`) to
@@ -80,6 +80,48 @@ One run:
 `--bootstrap-champion` sets `@champion` on the new version when no champion exists yet, for the
 very first model. Consumers load the model with
 `mlflow.xgboost.load_model("models:/fraud-xgb@champion")` and call `predict_proba`.
+
+## Retrain Job
+
+`python -m training.retrain` is the command of the Kubernetes Job the agent launches
+([contract](../docs/architecture/retrain-contract.md), manifest in `k8s/jobs/retrain-job.yaml`).
+It reads its inputs from the environment:
+
+| Variable | Default |
+|---|---|
+| `RUN_ID` | required, agent run id, becomes the `run_id` tag of the version |
+| `WINDOW_DAYS` | `7` |
+| `TRAIN_CONFIG` | `configs/xgb_baseline.yaml` (relative to the working directory or to `pipelines/`) |
+| `DATA_URI` | `s3://datasets/raw/creditcard.parquet` |
+| `PREDICTIONS_URI` | `s3://predictions/` (or a local folder with the same `dt=/hour=` layout) |
+
+1. loads and validates the base dataset from `DATA_URI`;
+2. reads the prediction log partitions of the last `WINDOW_DAYS` days and keeps labeled rows with
+   finite features, one per `transaction_id` (the last one wins); they are appended to the base
+   data on its time axis, in scoring order;
+3. tests on the newest labeled slice: the last `retrain.eval_share` (30 %) of the labeled rows,
+   cut by time, so it is strictly later than every training row. The rest of the data is split
+   per class into train and valid. With fewer than `retrain.min_eval_frauds` (20) frauds in that
+   slice, it falls back to the time-ordered split of everything (run tag `eval_slice=holdout`
+   instead of `recent`);
+4. trains and scores challenger and champion on that slice exactly like `training.train`, logs
+   `champion_*` metrics and the `gate_passed` / `gate_reasons` tags, registers the version with
+   tags `run_id`, `data_window`, `reference_uri`, and sets `@challenger`. `@champion` is left to the
+   agent.
+
+It exits 0 whether the gate passed or not, 1 on a technical failure (missing `RUN_ID`, unreadable
+data, MLflow or MinIO errors), with the traceback as the last lines of the log. The summary is
+printed as JSON on stdout.
+
+```bash
+RUN_ID=manual-1 DATA_URI=../data/creditcard.csv PREDICTIONS_URI=../data/predictions \
+  MLFLOW_TRACKING_URI=http://localhost:5000 uv run python -m training.retrain
+```
+
+On 285 k base rows plus 20 k labeled predictions it peaks at 0.72 GiB and takes about 25 s on two
+cores, hence the Job's 1 Gi request and 2 Gi limit. The image runs `python -m <module>`, so
+`docker run <image> training.retrain` and `docker run <image> training.train --data ...` both
+work; the Job sets `command: [python, -m, training.retrain]`.
 
 ## Registry
 

@@ -1,0 +1,51 @@
+# Template of the retrain Job, see docs/architecture/retrain-contract.md. Never applied as is:
+# the agent loads it from the retrain-job-template ConfigMap, sets the name, the run-id label and
+# the trainer env, then creates it in namespace infinity.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: retrain-template
+  labels:
+    app.kubernetes.io/part-of: infinity-mlops
+    app.kubernetes.io/component: retrain
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  activeDeadlineSeconds: 1800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: infinity-mlops
+        app.kubernetes.io/component: retrain
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: trainer
+          image: ghcr.io/toubani12/infinity-mlops/pipelines:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "training.retrain"]
+          envFrom:
+            - configMapRef:
+                name: platform-config
+            - secretRef:
+                name: platform-secrets
+          env:
+            - name: RUN_ID
+              value: ""
+            - name: WINDOW_DAYS
+              value: "7"
+            - name: TRAIN_CONFIG
+              value: configs/xgb_baseline.yaml
+            - name: DATA_URI
+              value: s3://datasets/raw/creditcard.parquet
+            - name: PREDICTIONS_URI
+              value: s3://predictions/
+          # Measured on 285k base rows plus 20k labeled predictions: 0.72 GiB peak RSS, about
+          # 25 s on 2 cores with the baseline config (n_jobs 4).
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi

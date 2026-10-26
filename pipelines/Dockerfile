@@ -6,6 +6,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH=/opt/venv/bin:$PATH \
+    PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     MLFLOW_DISABLE_AGENT_HINT=1 \
     MLFLOW_DISABLE_TELEMETRY=true
@@ -22,5 +23,7 @@ COPY registry ./registry
 RUN groupadd --system app && useradd --system --gid app --create-home app
 USER app
 
+# The module is the first argument: `docker run <image> training.retrain`, or the retrain Job's
+# `command: [python, -m, training.retrain]`, which replaces both lines below.
 ENTRYPOINT ["python", "-m"]
 CMD ["training.train", "--data", "s3://datasets/raw/creditcard.parquet"]

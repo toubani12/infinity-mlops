@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Only the template ships, as a ConfigMap mounted into the agent; the agent creates one Job per
+# run. Without a hash suffix the kubelet refreshes the mounted file in place when the template
+# changes, and the agent reads it on every launch, so no rollout is needed.
+configMapGenerator:
+  - name: retrain-job-template
+    files:
+      - retrain-job.yaml
+    options:
+      disableNameSuffixHash: true
