@@ -2,6 +2,8 @@ import asyncio
 import threading
 import uuid
 
+from prometheus_client import REGISTRY
+
 from agent.graph import thread
 from agent.runs import run_id_for
 from tests.conftest import make_harness
@@ -87,8 +89,22 @@ async def test_redelivered_alert_does_not_start_a_second_run(harness, drift_repo
 
 async def test_invalid_alert_is_ignored(harness, drift_report):
     manager = harness.manager()
+    alerts_before = REGISTRY.get_sample_value("agent_drift_alerts_total")
     assert await manager.on_drift_detected({"report_id": "x"}) is None
     assert harness.publisher.sent == []
+    assert REGISTRY.get_sample_value("agent_drift_alerts_total") == alerts_before
+
+
+async def test_every_valid_alert_updates_the_drift_gauges(harness, drift_report):
+    manager = harness.manager()
+    alerts_before = REGISTRY.get_sample_value("agent_drift_alerts_total")
+    await manager.on_drift_detected(drift_report | {"drift_share": 0.42})
+    await manager.on_drift_detected(another_report(drift_report) | {"drift_share": 0.37})
+    await manager.wait_idle()
+
+    assert REGISTRY.get_sample_value("agent_drift_alerts_total") == alerts_before + 2
+    assert REGISTRY.get_sample_value("agent_drift_share") == 0.37
+    assert REGISTRY.get_sample_value("agent_drift_alert_timestamp_seconds") > 0
 
 
 async def test_tool_error_publishes_failed_and_frees_the_slot(drift_report):

@@ -11,7 +11,15 @@ from agent.commands import AgentCommand, InvalidCommand
 from agent.deps import AgentDeps
 from agent.events import utc_now
 from agent.graph import thread
-from agent.metrics import ACTIVE_RUN, ALERTS_ATTACHED, RUNS_FINISHED, RUNS_STARTED
+from agent.metrics import (
+    ACTIVE_RUN,
+    ALERTS_ATTACHED,
+    DRIFT_ALERT_TIME,
+    DRIFT_ALERTS,
+    DRIFT_SHARE,
+    RUNS_FINISHED,
+    RUNS_STARTED,
+)
 from agent.tools.report import InvalidReport
 
 log = logging.getLogger(__name__)
@@ -62,6 +70,9 @@ class RunManager:
         except InvalidReport as exc:
             log.warning("ignoring invalid drift.detected: %s", exc)
             return None
+        DRIFT_ALERTS.inc()
+        DRIFT_SHARE.set(report.drift_share)
+        DRIFT_ALERT_TIME.set_to_current_time()
         run_id = run_id_for(report.report_id)
         async with self._lock:
             if self._active is not None:

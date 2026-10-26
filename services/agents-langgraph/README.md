@@ -96,6 +96,10 @@ curl -s localhost:8100/runs
 
 Compose has no Kubernetes API, so a real drift ends with `failed` at `launch_retrain_job` there; set `"drift_share": 0.1` and equal PR-AUCs for the noise path, or a non-empty `missing_features` for the data incident path. The full retrain and approval path runs in minikube. Approve a waiting run through the backend (`POST /api/agent/runs/{runId}/approve`) or by publishing an `agent.commands` message with that `run_id`.
 
+## Metrics
+
+`/metrics` exposes `agent_runs_started_total`, `agent_runs_finished_total{outcome}`, `agent_active_run`, `agent_alerts_attached_total`, `agent_events_published_total{step}`, and for every valid `drift.detected` consumed `agent_drift_alerts_total`, `agent_drift_share` and `agent_drift_alert_timestamp_seconds`. drift-monitor runs as a one-shot job and publishes only when a threshold is crossed, so the Grafana drift panel reads these gauges: they hold the last alert, not every monitored window, and reset to 0 when the agent restarts.
+
 ## Test
 
 ```bash
