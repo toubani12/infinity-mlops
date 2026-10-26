@@ -1,0 +1,10 @@
+{
+  "event_id": "2e3f4a5b-6c7d-4e8f-9a0b-1c2d3e4f5a6b",
+  "timestamp": "2026-10-26T10:11:42Z",
+  "run_id": "5b2c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e",
+  "model_name": "fraud-xgb",
+  "version": "4",
+  "alias": "champion",
+  "previous_version": "3",
+  "reason": "promotion"
+}
