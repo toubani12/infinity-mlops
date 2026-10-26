@@ -1,3 +1,4 @@
+import json
 import uuid
 from pathlib import Path
 
@@ -72,3 +73,11 @@ def transaction_payload(fraud: bool = False) -> dict:
         "amount": 42.5,
         "features": features,
     }
+
+
+RAW_EXAMPLE = (CONTRACTS / "examples" / "transaction.raw.v1.json").read_text()
+
+
+def raw(**overrides) -> bytes:
+    payload = json.loads(RAW_EXAMPLE) | {"transaction_id": str(uuid.uuid4())} | overrides
+    return json.dumps(payload).encode()
