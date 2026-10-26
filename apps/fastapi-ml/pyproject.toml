@@ -19,6 +19,9 @@ dependencies = [
 ]
 
 [dependency-groups]
+load = [
+    "locust>=2.43",
+]
 dev = [
     "httpx>=0.28.1",
     "jsonschema[format-nongpl]>=4.26.0",
@@ -30,6 +33,7 @@ dev = [
 
 [tool.uv]
 package = false
+default-groups = ["dev"]
 
 [tool.ruff]
 line-length = 100
