@@ -16,6 +16,7 @@
 | `pipelines` | `pipelines/**` |
 | `backend-spring` | `apps/backend-spring/**`, `libs/contracts/**` |
 | `frontend-next` | `apps/frontend-next/**` |
+| `k8s` | `k8s/**` (renders the base and both overlays with `kubectl kustomize`) |
 
 A change to `ci.yml` or `.github/actions/` runs every job. Python jobs run `uv sync --frozen`, `ruff check`, `ruff format --check` and `pytest -q` through `.github/actions/uv-checks`. A job whose folder has no `pyproject.toml`, `pom.xml` or `package-lock.json` yet passes with a notice.
 

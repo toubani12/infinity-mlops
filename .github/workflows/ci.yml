@@ -24,6 +24,7 @@ jobs:
       pipelines: ${{ steps.filter.outputs.pipelines }}
       backend-spring: ${{ steps.filter.outputs.backend-spring }}
       frontend-next: ${{ steps.filter.outputs.frontend-next }}
+      k8s: ${{ steps.filter.outputs.k8s }}
     steps:
       - uses: actions/checkout@v4
       - id: filter
@@ -58,6 +59,9 @@ jobs:
             frontend-next:
               - *ci
               - 'apps/frontend-next/**'
+            k8s:
+              - *ci
+              - 'k8s/**'
 
   contracts:
     needs: changes
@@ -173,6 +177,20 @@ jobs:
       - if: hashFiles('apps/frontend-next/package-lock.json') != ''
         run: npm test --if-present
 
+  k8s:
+    needs: changes
+    if: needs.changes.outputs.k8s == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp k8s/overlays/minikube/secrets.env.example k8s/overlays/minikube/secrets.env
+      - name: kustomize build
+        run: |
+          for dir in k8s/base k8s/overlays/minikube k8s/overlays/ci-kind; do
+            echo "== $dir"
+            kubectl kustomize "$dir" > /dev/null
+          done
+
   # The only required build check: it passes when every job succeeded or was skipped by the path filter.
   ci-gate:
     name: ci-gate
@@ -186,6 +204,7 @@ jobs:
       - pipelines
       - backend-spring
       - frontend-next
+      - k8s
     runs-on: ubuntu-latest
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

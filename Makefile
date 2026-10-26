@@ -8,10 +8,10 @@ WEB_PROJECT := apps/frontend-next
 
 export UV_SYSTEM_CERTS ?= 1
 
-.PHONY: help up up-apps down reset logs ps topics test lint fmt seed minikube
+.PHONY: help up up-apps down reset logs ps topics test lint fmt seed minikube k8s-validate
 
 help:
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-13s %s\n", $$1, $$2}'
 
 up: ## start Kafka, PostgreSQL, MinIO and MLflow, create buckets and topics
 	$(COMPOSE) up -d --wait --wait-timeout 180 $(INFRA_SERVICES)
@@ -60,3 +60,9 @@ seed: ## send demo transactions through the backend when the seed script exists
 minikube: ## start minikube and deploy the minikube overlay
 	@if [ -f scripts/bootstrap-minikube.sh ]; then bash scripts/bootstrap-minikube.sh; \
 	else echo "scripts/bootstrap-minikube.sh does not exist yet"; exit 1; fi
+
+k8s-validate: ## render the kustomize base and both overlays
+	@test -f k8s/overlays/minikube/secrets.env || cp k8s/overlays/minikube/secrets.env.example k8s/overlays/minikube/secrets.env
+	@set -e; for dir in k8s/base k8s/overlays/minikube k8s/overlays/ci-kind; do \
+		echo "== $$dir"; kubectl kustomize $$dir > /dev/null; \
+	done
