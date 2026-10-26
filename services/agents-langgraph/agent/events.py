@@ -11,9 +11,12 @@ def utc_now() -> str:
 
 
 class EventEmitter:
-    def __init__(self, publisher: Publisher, events_topic: str) -> None:
+    def __init__(
+        self, publisher: Publisher, events_topic: str, promoted_topic: str = "model.promoted"
+    ) -> None:
         self._publisher = publisher
         self._events_topic = events_topic
+        self._promoted_topic = promoted_topic
 
     async def emit(
         self,
@@ -39,3 +42,24 @@ class EventEmitter:
         await self._publisher.send(self._events_topic, run_id, event)
         EVENTS_PUBLISHED.labels(step=step).inc()
         return {"event_id": event["event_id"], "step": step}
+
+    async def model_promoted(
+        self,
+        run_id: str | None,
+        model_name: str,
+        version: str,
+        previous_version: str | None,
+        reason: str,
+    ) -> dict:
+        event = {
+            "event_id": str(uuid.uuid4()),
+            "timestamp": utc_now(),
+            "run_id": run_id,
+            "model_name": model_name,
+            "version": version,
+            "alias": "champion",
+            "previous_version": previous_version,
+            "reason": reason,
+        }
+        await self._publisher.send(self._promoted_topic, model_name, event)
+        return event

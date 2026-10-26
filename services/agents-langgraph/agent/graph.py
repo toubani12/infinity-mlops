@@ -5,7 +5,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from agent.deps import AgentDeps
-from agent.nodes.approval import request_approval
+from agent.nodes.approval import await_approval, promote, reject, request_approval
 from agent.nodes.intake import qualify, receive
 from agent.nodes.retrain import evaluate, retrain
 from agent.nodes.terminal import end_noise, escalate, fail, keep_champion
@@ -44,6 +44,10 @@ def route_decision(state: AgentState) -> str:
     return "request_approval" if state["decision"] == "promote" else "keep_champion"
 
 
+def route_approval(state: AgentState) -> str:
+    return "promote" if state["approval"]["action"] == "approve" else "reject"
+
+
 def build_graph(deps: AgentDeps, checkpointer: BaseCheckpointSaver | None) -> CompiledStateGraph:
     builder = StateGraph(AgentState)
     for fn in (
@@ -56,6 +60,9 @@ def build_graph(deps: AgentDeps, checkpointer: BaseCheckpointSaver | None) -> Co
         evaluate,
         keep_champion,
         request_approval,
+        await_approval,
+        promote,
+        reject,
     ):
         builder.add_node(fn.__name__, bind(fn, deps))
 
@@ -66,6 +73,8 @@ def build_graph(deps: AgentDeps, checkpointer: BaseCheckpointSaver | None) -> Co
     )
     builder.add_conditional_edges("retrain", route_retrain, ["evaluate", "fail"])
     builder.add_conditional_edges("evaluate", route_decision, ["request_approval", "keep_champion"])
-    for terminal in ("escalate", "end_noise", "fail", "keep_champion", "request_approval"):
+    builder.add_edge("request_approval", "await_approval")
+    builder.add_conditional_edges("await_approval", route_approval, ["promote", "reject"])
+    for terminal in ("escalate", "end_noise", "fail", "keep_champion", "promote", "reject"):
         builder.add_edge(terminal, END)
     return builder.compile(checkpointer=checkpointer)
