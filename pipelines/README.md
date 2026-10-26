@@ -147,8 +147,23 @@ uv run python -m registry.promote --version 3      # explicit version, also used
 
 The command prints `{"model_name", "version", "alias", "previous_version"}`, the fields of
 `model.promoted`. Whenever `@champion` moves, the version's reference sample is copied to
-`<root>/reference.parquet`, the file drift-monitor reads, so drift is always measured against the
-data of the model being served.
+`<root>/reference.parquet`, and the new champion gets the tag `previous_champion` (the version it
+replaced).
+
+```bash
+uv run python -m registry.promote rollback                          # back to previous_champion
+uv run python -m registry.promote rollback --to 3 --kafka-bootstrap localhost:9092
+```
+
+`rollback` moves `@champion` back to `--to`, by default to the `previous_champion` tag of the
+current champion, without recording a new `previous_champion` (a second rollback does not flip
+back). It prints the `model.promoted` v1 payload with `reason: rollback` and, with
+`--kafka-bootstrap`, also publishes it keyed by `model_name`, so every fastapi-ml replica reloads.
+The agent moves `@champion` with a plain alias call and does not write `previous_champion`; after
+an agent promotion, pass the `previous_version` of its `model.promoted` event with `--to`.
+
+drift-monitor resolves its reference from the `reference_uri` tag of the version behind
+`@champion`, so it follows the champion whoever moved the alias.
 
 ## Drift simulator
 
