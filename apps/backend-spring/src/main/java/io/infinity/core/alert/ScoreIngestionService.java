@@ -2,6 +2,8 @@ package io.infinity.core.alert;
 
 import io.infinity.core.transaction.Transaction;
 import io.infinity.core.transaction.TransactionRepository;
+import io.infinity.core.transaction.TransactionResponse;
+import io.infinity.core.transaction.TransactionScoredEvent;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
@@ -9,6 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +28,7 @@ public class ScoreIngestionService {
     private final AlertRepository alerts;
     private final AlertProperties properties;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
     private final Counter alertsCreated;
     private final Counter unknownTransactions;
 
@@ -33,11 +37,13 @@ public class ScoreIngestionService {
             AlertRepository alerts,
             AlertProperties properties,
             Clock clock,
+            ApplicationEventPublisher events,
             MeterRegistry meters) {
         this.transactions = transactions;
         this.alerts = alerts;
         this.properties = properties;
         this.clock = clock;
+        this.events = events;
         this.alertsCreated = meters.counter("infinity.alerts.created");
         this.unknownTransactions = meters.counter("infinity.scores.unknown.transaction");
     }
@@ -56,7 +62,12 @@ public class ScoreIngestionService {
         }
         Transaction transaction = found.get();
         transaction.applyScore(update.fraudScore(), update.fraud(), update.modelVersion(), update.scoredAt());
-        return Optional.of(new Outcome(transaction, raiseAlertIfNeeded(transaction.getId(), update.fraudScore())));
+        events.publishEvent(new TransactionScoredEvent(TransactionResponse.from(transaction)));
+        Alert alert = raiseAlertIfNeeded(transaction.getId(), update.fraudScore());
+        if (alert != null) {
+            events.publishEvent(new AlertChangedEvent(AlertResponse.from(alert)));
+        }
+        return Optional.of(new Outcome(transaction, alert));
     }
 
     @Nullable
