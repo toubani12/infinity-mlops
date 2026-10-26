@@ -5,7 +5,9 @@ from dataclasses import asdict, dataclass, field
 from typing import Literal
 
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.types import Command
 
+from agent.commands import AgentCommand, InvalidCommand
 from agent.deps import AgentDeps
 from agent.events import utc_now
 from agent.graph import thread
@@ -17,6 +19,8 @@ log = logging.getLogger(__name__)
 RUN_NAMESPACE = uuid.UUID("6f1c2a4e-8d3b-4c5a-9e7f-0a1b2c3d4e5f")
 
 RunStatus = Literal["running", "awaiting_approval", "finished"]
+
+AWAITING = ("await_approval",)
 
 
 def run_id_for(report_id: str) -> str:
@@ -70,6 +74,39 @@ class RunManager:
             self._start(run_id, report.report_id, message)
         return run_id
 
+    async def on_command(self, message: dict) -> bool:
+        try:
+            command = AgentCommand.parse(message)
+        except InvalidCommand as exc:
+            log.warning("ignoring invalid agent.commands: %s", exc)
+            return False
+        async with self._lock:
+            record = self._runs.get(command.run_id)
+            if record is None and not await self._recover(command.run_id):
+                log.info("ignoring %s for unknown run %s", command.action, command.run_id)
+                return False
+            record = self._runs[command.run_id]
+            if record.status != "awaiting_approval":
+                log.info("ignoring %s, run %s is %s", command.action, record.run_id, record.status)
+                return False
+            record.status = "running"
+            resume = Command(resume=command.resume_value())
+            self._spawn(record.run_id, self._graph.ainvoke(resume, thread(record.run_id)))
+        return True
+
+    async def recover(self) -> None:
+        """After a restart, the run waiting for approval takes the retrain slot again."""
+        # Collect first: the Postgres saver holds its connection while alist() is iterating.
+        run_ids = {
+            checkpoint.config["configurable"]["thread_id"]
+            async for checkpoint in self._graph.checkpointer.alist(None)
+        }
+        for run_id in run_ids:
+            await self._recover(run_id)
+        waiting = [r for r in self._runs.values() if r.status == "awaiting_approval"]
+        if waiting:
+            self._active = max(waiting, key=lambda record: record.started_at).run_id
+
     async def wait_idle(self) -> None:
         while self._tasks:
             await asyncio.gather(*list(self._tasks))
@@ -80,11 +117,29 @@ class RunManager:
         ACTIVE_RUN.set(1)
         RUNS_STARTED.inc()
         initial = {"run_id": run_id, "report": message, "attached_reports": [], "events": []}
-        task = asyncio.create_task(
-            self._drive(run_id, self._graph.ainvoke(initial, thread(run_id)))
-        )
+        self._spawn(run_id, self._graph.ainvoke(initial, thread(run_id)))
+
+    def _spawn(self, run_id: str, invocation) -> None:
+        task = asyncio.create_task(self._drive(run_id, invocation))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+
+    async def _recover(self, run_id: str) -> bool:
+        snapshot = await self._graph.aget_state(thread(run_id))
+        if snapshot.next != AWAITING:
+            return False
+        values = snapshot.values
+        self._runs[run_id] = RunRecord(
+            run_id,
+            values["report"]["report_id"],
+            snapshot.created_at or utc_now(),
+            status="awaiting_approval",
+            outcome="awaiting_approval",
+            attached_reports=list(values.get("attached_reports", [])),
+        )
+        self._active = run_id
+        ACTIVE_RUN.set(1)
+        return True
 
     async def _drive(self, run_id: str, invocation) -> None:
         try:
@@ -95,8 +150,9 @@ class RunManager:
             self._finish(run_id, "failed")
             return
         outcome = result.get("outcome")
-        if outcome == "awaiting_approval":
+        if "__interrupt__" in result:
             self._runs[run_id].status = "awaiting_approval"
+            self._runs[run_id].outcome = outcome
             return
         self._finish(run_id, outcome or "failed")
 

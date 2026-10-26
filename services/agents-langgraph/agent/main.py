@@ -47,7 +47,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or Settings()
     publisher = KafkaPublisher(settings.kafka_bootstrap_servers)
-    emitter = EventEmitter(publisher, settings.events_topic)
+    emitter = EventEmitter(publisher, settings.events_topic, settings.promoted_topic)
     deps = AgentDeps(
         settings=settings,
         tools=toolset_factory(settings, emitter),
