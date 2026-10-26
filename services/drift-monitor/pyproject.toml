@@ -8,6 +8,7 @@ dependencies = [
     "aiokafka>=0.14.0",
     "boto3>=1.43.118",
     "evidently==0.7.23",
+    "mlflow-skinny==3.17.2",
     "pandas>=2.2,<3",
     "pyarrow>=26.0.0",
     "pydantic-settings>=2.16.1",

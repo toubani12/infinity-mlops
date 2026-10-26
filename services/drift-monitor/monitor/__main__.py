@@ -7,6 +7,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from monitor.publisher import KafkaPublisher, Publisher, build_event
+from monitor.reference import resolve_reference_uri
 from monitor.report import DriftResult, Window, analyze, load_window, summary_of
 from monitor.storage import Storage
 from monitor.thresholds import Thresholds
@@ -19,7 +20,9 @@ class Settings(BaseSettings):
 
     kafka_bootstrap_servers: str = "localhost:9092"
     s3_endpoint_url: str | None = None
-    reference_uri: str = "s3://datasets/reference/reference.parquet"
+    reference_uri: str = "auto"
+    fallback_reference_uri: str = "s3://datasets/reference/reference.parquet"
+    model_name: str = "fraud-xgb"
     predictions_uri: str = "s3://predictions"
     reports_uri: str = "s3://drift-reports"
     window_hours: int = Field(default=1, ge=1)
@@ -39,7 +42,10 @@ def run(
     if len(current) < settings.min_window_rows:
         log.info("window has %d rows, below %d: no report", len(current), settings.min_window_rows)
         return None
-    reference = storage.read_parquet(settings.reference_uri)
+    reference_uri = resolve_reference_uri(
+        settings.reference_uri, settings.fallback_reference_uri, settings.model_name
+    )
+    reference = storage.read_parquet(reference_uri)
     result = analyze(
         current,
         reference,

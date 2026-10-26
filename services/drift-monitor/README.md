@@ -35,7 +35,9 @@ from the snapshot tests). It does not import with pandas 3, hence `pandas<3`.
 |---|---|
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` |
 | `S3_ENDPOINT_URL` | unset (`http://minio:9000` in compose), with the AWS credential variables |
-| `REFERENCE_URI` | `s3://datasets/reference/reference.parquet` |
+| `REFERENCE_URI` | `auto`: the `reference_uri` tag of the version behind `@champion`, read from MLflow (`MLFLOW_TRACKING_URI`) |
+| `FALLBACK_REFERENCE_URI` | `s3://datasets/reference/reference.parquet`, used when the registry or the tag is unavailable |
+| `MODEL_NAME` | `fraud-xgb` |
 | `PREDICTIONS_URI` | `s3://predictions` |
 | `REPORTS_URI` | `s3://drift-reports` |
 | `WINDOW_HOURS` / `MIN_WINDOW_ROWS` / `MAX_REPORT_ROWS` | `1` / `200` / `50000` |

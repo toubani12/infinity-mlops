@@ -209,6 +209,7 @@ services:
       <<: *minio-credentials
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       S3_ENDPOINT_URL: http://minio:9000
+      MLFLOW_TRACKING_URI: http://mlflow:5000
     restart: "no"
 
   frontend-next:
