@@ -15,11 +15,15 @@ Spring Boot 3.5, Java 21, PostgreSQL with Flyway, Actuator with Prometheus metri
 | PATCH | `/api/alerts/{id}` | body `{ "status": "ACKNOWLEDGED" }` |
 | GET | `/api/drift/reports?page&size` and `/api/drift/reports/{id}` | from `drift.detected`, newest first |
 | GET | `/api/models/versions?page&size` | champion alias moves from `model.promoted`, newest first |
+| GET | `/api/stream/transactions` | SSE, event `transaction` (same JSON as the REST transaction) after each score |
+| GET | `/api/stream/alerts` | SSE, event `alert` when an alert opens or changes status |
 | GET | `/actuator/health`, `/actuator/prometheus` | |
 
 REST bodies use camelCase. Kafka payloads follow `libs/contracts` (snake_case). Lists return `{ content, page, size, totalElements, totalPages }`. Errors are RFC 9457 problem details (`application/problem+json`); validation errors add an `errors` map keyed by field.
 
 The server generates `transactionId` and `timestamp` when they are absent; a duplicate `transactionId` returns 409. Alert status only moves forward (`OPEN` → `ACKNOWLEDGED` → `CLOSED`); going back returns 409.
+
+Streams are fed after the database commit (`@TransactionalEventListener`) by an in-memory broadcaster: one sender thread keeps event order and isolates the Kafka consumer from slow clients, a comment heartbeat goes out every 15 s, each stream closes after 30 min and announces `retry: 3000`. The broadcaster is per instance, so with several replicas the ingress needs sticky sessions or each replica must consume with its own group. Connected clients: `infinity_sse_clients{channel}`.
 
 ## Security
 
