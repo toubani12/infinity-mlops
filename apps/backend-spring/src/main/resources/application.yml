@@ -37,6 +37,8 @@ infinity:
     heartbeat-ms: 15000
   alerts:
     threshold: ${ALERT_THRESHOLD:0.5}
+  agent:
+    max-p95-latency-ms: ${MAX_P95_LATENCY_MS:50}
   outbox:
     enabled: true
     batch-size: 500

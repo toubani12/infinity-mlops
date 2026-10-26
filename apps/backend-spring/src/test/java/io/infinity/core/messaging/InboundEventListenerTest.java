@@ -12,6 +12,9 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.infinity.core.alert.ScoreIngestionService;
 import io.infinity.core.alert.ScoreUpdate;
+import io.infinity.core.modelops.AgentRunService;
+import io.infinity.core.modelops.AgentStep;
+import io.infinity.core.modelops.AgentStepEvent;
 import io.infinity.core.modelops.DriftReport;
 import io.infinity.core.modelops.ModelOpsService;
 import io.infinity.core.modelops.ModelVersionEvent;
@@ -27,9 +30,10 @@ class InboundEventListenerTest {
     private final ObjectMapper json = JsonMapper.builder().findAndAddModules().build();
     private final ScoreIngestionService scores = mock(ScoreIngestionService.class);
     private final ModelOpsService modelOps = mock(ModelOpsService.class);
+    private final AgentRunService agentRuns = mock(AgentRunService.class);
     private final Instant now = Instant.parse("2026-10-26T10:00:05Z");
     private final InboundEventListener listener =
-            new InboundEventListener(json, scores, modelOps, Clock.fixed(now, ZoneOffset.UTC));
+            new InboundEventListener(json, scores, modelOps, agentRuns, Clock.fixed(now, ZoneOffset.UTC));
 
     @Test
     void mapsTheContractExampleToAScoreUpdate() {
@@ -103,5 +107,32 @@ class InboundEventListenerTest {
         noVersion.remove("version");
         assertThatThrownBy(() -> listener.onModelPromoted(noVersion.toString()))
                 .isInstanceOf(InvalidMessageException.class);
+    }
+
+    @Test
+    void mapsTheAgentEventExample() {
+        listener.onAgentEvent(ContractSchemas.example("agent.events"));
+
+        ArgumentCaptor<AgentStepEvent> captor = ArgumentCaptor.forClass(AgentStepEvent.class);
+        verify(agentRuns).record(captor.capture());
+        AgentStepEvent event = captor.getValue();
+        assertThat(event.runId()).isEqualTo(UUID.fromString("5b2c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e"));
+        assertThat(event.step()).isEqualTo(AgentStep.APPROVAL_REQUESTED);
+        assertThat(event.decision()).isEqualTo("promote");
+        assertThat(event.requiresApproval()).isTrue();
+        assertThat(event.payload().at("/challenger/pr_auc").asDouble()).isEqualTo(0.83);
+    }
+
+    @Test
+    void rejectsAgentEventsWithUnknownStepOrNoPayload() throws Exception {
+        ObjectNode unknown = (ObjectNode) json.readTree(ContractSchemas.example("agent.events"));
+        unknown.put("step", "exploded");
+        assertThatThrownBy(() -> listener.onAgentEvent(unknown.toString())).hasMessageContaining("exploded");
+
+        ObjectNode noPayload = (ObjectNode) json.readTree(ContractSchemas.example("agent.events"));
+        noPayload.remove("payload");
+        assertThatThrownBy(() -> listener.onAgentEvent(noPayload.toString()))
+                .isInstanceOf(InvalidMessageException.class);
+        verify(agentRuns, never()).record(any());
     }
 }
