@@ -19,6 +19,7 @@ resources:
   - agents-langgraph
   - drift-monitor
   - observability
+  - network-policies
 
 # platform-config and platform-secrets keep stable names: the retrain Job created at runtime by
 # the agent references them by name, and kustomize cannot rewrite a hash suffix it never sees.
