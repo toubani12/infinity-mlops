@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { transaction } from "@/test/fixtures";
-import { formatAmount, formatTime, riskBand, shortId } from "./format";
+import { formatAmount, formatTime, formatWhen, riskBand, shortId } from "./format";
 import { DEFAULT_FILTERS, matchesFilters, upsertTransaction } from "./transactions";
 
 describe("transaction filters", () => {
@@ -34,6 +34,8 @@ describe("format", () => {
     expect(shortId("7f8d4c2e-1b3a-4e5f")).toBe("7f8d4c2e");
     expect(formatTime("2026-10-26T09:15:07Z", new Date("2026-10-26T12:00:00Z"))).toMatch(/\d{2}:15:07/);
     expect(formatTime("2026-10-20T09:15:07Z", new Date("2026-10-26T12:00:00Z"))).toMatch(/20 Oct/);
+    expect(formatWhen("2026-10-20T09:15:07Z", new Date("2026-10-26T12:00:00Z"))).toMatch(/^on 20 Oct/);
+    expect(formatWhen("2026-10-26T09:15:07Z", new Date("2026-10-26T12:00:00Z"))).toMatch(/^at /);
     expect([riskBand(0.9), riskBand(0.3), riskBand(0.1)]).toEqual(["high", "elevated", "low"]);
   });
 });

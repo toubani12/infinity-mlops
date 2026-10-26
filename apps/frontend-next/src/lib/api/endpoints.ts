@@ -36,6 +36,8 @@ export const alertsApi = {
 export const driftApi = {
   reports: (params: PageParams = {}, options?: CallOptions) =>
     apiFetch<Page<DriftReport>>("/api/drift/reports", { ...options, query: { ...params } }),
+  report: (id: Uuid, options?: CallOptions) =>
+    apiFetch<DriftReport>(`/api/drift/reports/${encodeURIComponent(id)}`, options),
 };
 
 export const modelsApi = {
