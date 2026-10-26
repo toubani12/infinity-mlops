@@ -19,7 +19,9 @@ Spring Boot 3.5, Java 21, PostgreSQL with Flyway, Actuator with Prometheus metri
 | GET | `/api/stream/alerts` | SSE, event `alert` when an alert opens or changes status |
 | GET | `/api/agent/runs?page&size&status` | agent runs, newest first |
 | GET | `/api/agent/runs/{runId}` | `{ run, champion, challenger, gate, events }` |
-| GET | `/api/stream/agent` | SSE, event `agent` with `{ run, event }` on each step |
+| POST | `/api/agent/runs/{runId}/approve` | admin only, publishes `agent.commands` |
+| POST | `/api/agent/runs/{runId}/reject` | admin only, body `{ "reason": "..." }` (3 to 500 characters after trimming) |
+| GET | `/api/stream/agent` | SSE, event `agent` with `{ run, event }` on each step and when a decision is sent |
 | GET | `/actuator/health`, `/actuator/prometheus` | |
 
 REST bodies use camelCase. Kafka payloads follow `libs/contracts` (snake_case). Lists return `{ content, page, size, totalElements, totalPages }`. Errors are RFC 9457 problem details (`application/problem+json`); validation errors add an `errors` map keyed by field.
@@ -72,6 +74,8 @@ It consumes `transaction.scored` in group `backend-spring`. Each record updates 
 | `NOISE` | `completed` (noise) |
 
 A final status never changes, so the `completed` that follows `rejected` and a `received` for an alert attached to the run leave it as is. Champion and challenger metrics come from the `evaluated` and `approval_requested` payloads, the gate result and reasons from `evaluated`; the detail also returns `gate.maxP95LatencyMs` (`MAX_P95_LATENCY_MS`, same default as the agent).
+
+Approve and reject need the `admin` role and answer 409 unless the run is `AWAITING_APPROVAL` with no decision sent yet. The command (`run_id`, `command_id`, `timestamp`, `action`, `actor` = JWT subject, `reason`) is sent keyed by `run_id` and acknowledged by the broker inside the database transaction: the run keeps it as `pendingCommand` until the agent answers with `approved` or `rejected`, and a failed send returns 503 and changes nothing. Two admins deciding at the same time are serialized by the row version, the second one gets 409.
 
 ## Configuration
 
