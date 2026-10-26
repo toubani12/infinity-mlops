@@ -69,8 +69,7 @@ One run:
    (single-row `predict_proba` calls);
 4. when a champion exists, evaluates it on the same test block, logs `champion_pr_auc`,
    `champion_recall_at_p90`, `champion_p95_latency_ms` and the `gate_passed` tag
-   (`training.evaluate.compare`: PR-AUC and recall at 90 % precision both at least the champion's,
-   p95 under 50 ms) with the `gate_reasons` tag (reasons joined by `; `);
+   and the `gate_reasons` tag (see [Gate](#gate));
 5. logs params, metrics, `evaluation.json` (split summary, gate reasons) and the model
    (`mlflow.xgboost`), registers it as `fraud-xgb` (`MODEL_NAME`) and sets `@challenger`;
 6. writes the reference sample (test block with `fraud_score`, `label`, `model_version`) to
@@ -80,6 +79,22 @@ One run:
 `--bootstrap-champion` sets `@champion` on the new version when no champion exists yet, for the
 very first model. Consumers load the model with
 `mlflow.xgboost.load_model("models:/fraud-xgb@champion")` and call `predict_proba`.
+
+## Gate
+
+`training.evaluate.compare` is the only gate implementation; `training.train` and
+`training.retrain` both call it with the challenger and champion metrics measured on the same
+test slice. The challenger passes when:
+
+- its PR-AUC is strictly above the champion's (a tie keeps the champion in place),
+- its recall at 90 % precision is at least the champion's,
+- its single-row p95 latency is under `max_p95_ms` (50 ms).
+
+Without a champion only the latency rule applies. Every rule is checked and reported, e.g.
+`p95_latency_ms 3.36 < 50; pr_auc 0.8248 > champion 0.6851; recall_at_p90 0.6647 >= champion
+0.4682`, which is the `gate_reasons` tag; `evaluation.json` keeps the list. A failed gate is a
+normal outcome: the version is still registered as `@challenger`, and the agent keeps the
+champion.
 
 ## Retrain Job
 
