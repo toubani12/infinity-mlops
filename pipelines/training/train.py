@@ -165,9 +165,7 @@ def train_on_split(
         if champion:
             champion_values = champion.to_dict()
             mlflow.log_metrics({f"champion_{k}": champion_values[k] for k in CHAMPION_METRICS})
-        mlflow.set_tags(
-            {"gate_passed": str(gate.passed).lower(), "gate_reasons": "; ".join(gate.reasons)}
-        )
+        mlflow.set_tags({"gate_passed": str(gate.passed).lower(), "gate_reasons": gate.summary()})
         mlflow.log_dict({"split": split.summary(), "gate": asdict(gate)}, "evaluation.json")
         example = split.test[FEATURES].head(5)
         info = mlflow.xgboost.log_model(

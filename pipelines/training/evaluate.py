@@ -6,8 +6,6 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
 
-GATE_METRICS = ("pr_auc", "recall_at_p90")
-
 
 @dataclass(frozen=True)
 class Metrics:
@@ -24,6 +22,9 @@ class Metrics:
 class GateResult:
     passed: bool
     reasons: list[str] = field(default_factory=list)
+
+    def summary(self) -> str:
+        return "; ".join(self.reasons)
 
 
 def pr_auc(y_true: np.ndarray, scores: np.ndarray) -> float:
@@ -68,24 +69,32 @@ def compare(
     challenger_metrics: Mapping[str, float],
     max_p95_ms: float = 50.0,
 ) -> GateResult:
-    """The challenger wins only if it matches or beats the champion on PR-AUC and recall at
-    90 % precision, and its single-row p95 latency stays under the budget."""
+    """The single promotion gate: the challenger must beat the champion on PR-AUC, match it at
+    least on recall at 90 % precision, and keep its single-row p95 latency under the budget.
+    Every rule is checked so the reasons list all failures at once."""
     reasons: list[str] = []
     passed = True
     latency = challenger_metrics["p95_latency_ms"]
-    if latency >= max_p95_ms:
-        passed = False
-        reasons.append(f"p95_latency_ms {latency:.2f} is not under {max_p95_ms:.0f}")
+    if latency < max_p95_ms:
+        reasons.append(f"p95_latency_ms {latency:.2f} < {max_p95_ms:g}")
     else:
-        reasons.append(f"p95_latency_ms {latency:.2f} < {max_p95_ms:.0f}")
+        passed = False
+        reasons.append(f"p95_latency_ms {latency:.2f} is not under {max_p95_ms:g}")
     if champion_metrics is None:
         reasons.append("no champion to compare with")
         return GateResult(passed, reasons)
-    for metric in GATE_METRICS:
-        challenger, champion = challenger_metrics[metric], champion_metrics[metric]
-        if challenger < champion:
-            passed = False
-            reasons.append(f"{metric} {challenger:.4f} is below champion {champion:.4f}")
-        else:
-            reasons.append(f"{metric} {challenger:.4f} >= champion {champion:.4f}")
+
+    challenger, champion = challenger_metrics["pr_auc"], champion_metrics["pr_auc"]
+    if challenger > champion:
+        reasons.append(f"pr_auc {challenger:.4f} > champion {champion:.4f}")
+    else:
+        passed = False
+        reasons.append(f"pr_auc {challenger:.4f} is not above champion {champion:.4f}")
+
+    challenger, champion = challenger_metrics["recall_at_p90"], champion_metrics["recall_at_p90"]
+    if challenger >= champion:
+        reasons.append(f"recall_at_p90 {challenger:.4f} >= champion {champion:.4f}")
+    else:
+        passed = False
+        reasons.append(f"recall_at_p90 {challenger:.4f} is below champion {champion:.4f}")
     return GateResult(passed, reasons)

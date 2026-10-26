@@ -40,23 +40,39 @@ def test_p95_latency_measures_single_rows(frame) -> None:
     assert latency >= 2.0
 
 
-def test_gate_passes_without_champion() -> None:
+def test_gate_accepts_first_model_without_champion() -> None:
     result = compare(None, CHAMPION)
     assert result.passed
     assert result.reasons == ["p95_latency_ms 5.00 < 50", "no champion to compare with"]
 
 
-def test_gate_passes_when_challenger_matches_or_beats() -> None:
-    challenger = CHAMPION | {"pr_auc": 0.85}
-    assert compare(CHAMPION, challenger).passed
+def test_gate_rejects_first_model_over_latency_budget() -> None:
+    result = compare(None, CHAMPION | {"p95_latency_ms": 75.0})
+    assert not result.passed
+    assert result.summary() == "p95_latency_ms 75.00 is not under 50; no champion to compare with"
+
+
+def test_gate_accepts_better_pr_auc_with_equal_recall() -> None:
+    result = compare(CHAMPION, CHAMPION | {"pr_auc": 0.85})
+    assert result.passed
+    assert result.reasons == [
+        "p95_latency_ms 5.00 < 50",
+        "pr_auc 0.8500 > champion 0.8200",
+        "recall_at_p90 0.7000 >= champion 0.7000",
+    ]
+
+
+def test_gate_rejects_a_challenger_that_only_ties() -> None:
+    result = compare(CHAMPION, CHAMPION)
+    assert not result.passed
+    assert "pr_auc 0.8200 is not above champion 0.8200" in result.reasons
 
 
 @pytest.mark.parametrize(
     ("change", "reason"),
     [
-        ({"pr_auc": 0.80}, "pr_auc 0.8000 is below champion 0.8200"),
-        ({"recall_at_p90": 0.65}, "recall_at_p90 0.6500 is below champion 0.7000"),
-        ({"p95_latency_ms": 50.0}, "p95_latency_ms 50.00 is not under 50"),
+        ({"pr_auc": 0.80}, "pr_auc 0.8000 is not above champion 0.8200"),
+        ({"pr_auc": 0.90, "recall_at_p90": 0.65}, "recall_at_p90 0.6500 is below champion 0.7000"),
     ],
 )
 def test_gate_rejects_worse_challenger(change, reason) -> None:
@@ -65,5 +81,25 @@ def test_gate_rejects_worse_challenger(change, reason) -> None:
     assert reason in result.reasons
 
 
+def test_gate_rejects_on_latency_even_when_metrics_improve() -> None:
+    result = compare(CHAMPION, CHAMPION | {"pr_auc": 0.9, "p95_latency_ms": 50.0})
+    assert not result.passed
+    assert result.reasons[0] == "p95_latency_ms 50.00 is not under 50"
+    assert "pr_auc 0.9000 > champion 0.8200" in result.reasons
+
+
+def test_gate_lists_every_failure() -> None:
+    worse = {"pr_auc": 0.5, "recall_at_p90": 0.1, "roc_auc": 0.9, "p95_latency_ms": 60.0}
+    result = compare(CHAMPION, worse)
+    assert not result.passed
+    assert result.reasons == [
+        "p95_latency_ms 60.00 is not under 50",
+        "pr_auc 0.5000 is not above champion 0.8200",
+        "recall_at_p90 0.1000 is below champion 0.7000",
+    ]
+
+
 def test_gate_latency_budget_is_configurable() -> None:
-    assert not compare(CHAMPION, CHAMPION, max_p95_ms=5.0).passed
+    better = CHAMPION | {"pr_auc": 0.85}
+    assert compare(CHAMPION, better).passed
+    assert not compare(CHAMPION, better, max_p95_ms=5.0).passed
