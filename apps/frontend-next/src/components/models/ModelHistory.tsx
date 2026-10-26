@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
 import { useApiResource } from "@/hooks/useApiResource";
 import { modelsApi, type ModelVersionEvent } from "@/lib/api";
@@ -65,7 +66,10 @@ export function ModelHistory() {
               {describe(event)} {formatWhen(event.timestamp)}
               {event.runId ? (
                 <>
-                  , agent run <span className="font-mono text-[13px]">{shortId(event.runId)}</span>
+                  , agent run{" "}
+                  <Link href={`/agent/${event.runId}`} className="font-mono text-[13px] text-accent hover:underline">
+                    {shortId(event.runId)}
+                  </Link>
                 </>
               ) : null}
             </p>

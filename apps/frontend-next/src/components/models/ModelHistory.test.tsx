@@ -35,7 +35,10 @@ describe("model history", () => {
     expect(headings.map((h) => h.textContent)).toEqual(["fraud-xgb v4", "fraud-xgb v3"]);
     expect(screen.getByText("Serving now")).toBeInTheDocument();
     expect(screen.getByText("Rollback")).toBeInTheDocument();
-    expect(screen.getByText("5b2c7d8e")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "5b2c7d8e" })).toHaveAttribute(
+      "href",
+      "/agent/5b2c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e",
+    );
     expect(screen.getByText(/Rolled back from v2/)).toBeInTheDocument();
   });
 

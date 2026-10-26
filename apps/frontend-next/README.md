@@ -19,6 +19,8 @@ The client reads `NEXT_PUBLIC_API_BASE_URL` (default `http://localhost:8080`). N
 
 Live data: the Transactions page loads the latest 100 rows, then merges `transaction` events from `/api/stream/transactions`; the Alerts page does the same with `/api/stream/alerts` and sends `PATCH /api/alerts/{id}` for Acknowledge and Close. The token goes in the `Authorization` header for REST and in `?access_token=` for SSE, because `EventSource` cannot set headers. On error the stream is closed and reopened after 1, 2, 4 ... 30 s.
 
+Agent: `/agent` lists runs with their status and follows `/api/stream/agent`; `/agent/{runId}` shows the step timeline, the champion against challenger table (PR-AUC and recall at 90 % precision must beat the champion, p95 latency must stay under `gate.maxP95LatencyMs`) and, while the run awaits approval, Approve and Reject. Both open a confirmation dialog, Reject needs a reason of at least 3 characters. Only the `admin` role sees the buttons; the backend enforces the same rule. A sent decision shows as pending until the agent confirms it with `approved` or `rejected`. The Models page links each promotion to its run.
+
 ## Run and test
 
 ```bash
