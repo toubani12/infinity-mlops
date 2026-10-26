@@ -37,7 +37,11 @@ export class FakeEventSource {
   }
 
   emit(type: string, data: unknown) {
-    const event = new MessageEvent<string>(type, { data: JSON.stringify(data) });
+    this.emitRaw(type, JSON.stringify(data));
+  }
+
+  emitRaw(type: string, data: string) {
+    const event = new MessageEvent<string>(type, { data });
     this.listeners.get(type)?.forEach((listener) => listener(event));
   }
 }
