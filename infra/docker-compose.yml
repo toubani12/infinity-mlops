@@ -172,6 +172,7 @@ services:
       S3_ENDPOINT_URL: http://minio:9000
       MODEL_NAME: ${MODEL_NAME:-fraud-xgb}
       FRAUD_THRESHOLD: ${FRAUD_THRESHOLD:-0.5}
+      KAFKA_ENABLED: "true"
 
   agents-langgraph:
     profiles: [apps]

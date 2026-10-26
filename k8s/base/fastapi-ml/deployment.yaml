@@ -36,6 +36,8 @@ spec:
                   key: AWS_SECRET_ACCESS_KEY
             - name: FRAUD_THRESHOLD
               value: "0.5"
+            - name: KAFKA_ENABLED
+              value: "true"
           startupProbe:
             httpGet:
               path: /health
