@@ -131,9 +131,10 @@ def test_periodic_flush(tmp_path) -> None:
         task = asyncio.create_task(writer.run(interval=0.01))
         add(writer, 1)
         async with asyncio.timeout(5):
-            while writer.buffered:
+            while not list(tmp_path.rglob("*.parquet")):
                 await asyncio.sleep(0.01)
         task.cancel()
+        assert writer.buffered == 0
         return list(tmp_path.rglob("*.parquet"))
 
     assert len(asyncio.run(scenario())) == 1
