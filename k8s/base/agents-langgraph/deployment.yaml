@@ -52,6 +52,12 @@ spec:
               value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/agent
             - name: LLM_PROVIDER
               value: none
+            - name: RETRAIN_TEMPLATE_PATH
+              value: /etc/agent/retrain/retrain-job.yaml
+          volumeMounts:
+            - name: retrain-template
+              mountPath: /etc/agent/retrain
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /health
@@ -70,3 +76,10 @@ spec:
               memory: 256Mi
             limits:
               memory: 512Mi
+      volumes:
+        # Generated from k8s/jobs/retrain-job.yaml; optional until that template lands, the agent
+        # then fails the run with "retrain template not found" instead of the pod not starting.
+        - name: retrain-template
+          configMap:
+            name: retrain-job-template
+            optional: true
