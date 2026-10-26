@@ -8,6 +8,7 @@ class Thresholds(BaseSettings):
     drift_share: float = Field(default=0.3, ge=0, le=1, alias="DRIFT_SHARE_THRESHOLD")
     pr_auc_drop: float = Field(default=0.05, ge=0, le=1, alias="PR_AUC_DROP_THRESHOLD")
     out_of_range_share: float = Field(default=0.05, ge=0, le=1, alias="OUT_OF_RANGE_THRESHOLD")
+    missing_share: float = Field(default=0.1, gt=0, le=1, alias="MISSING_SHARE_THRESHOLD")
     range_margin: float = Field(default=0.1, ge=0, alias="RANGE_MARGIN")
     min_labeled_rows: int = Field(default=200, ge=1, alias="MIN_LABELED_ROWS")
     min_labeled_frauds: int = Field(default=5, ge=1, alias="MIN_LABELED_FRAUDS")

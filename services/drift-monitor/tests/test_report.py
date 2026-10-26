@@ -41,6 +41,15 @@ def test_missing_features_detects_absent_null_and_stuck_columns() -> None:
     assert missing_features(frame(200, seed=1), reference) == []
 
 
+def test_partial_outage_counts_as_missing() -> None:
+    reference, current = frame(1000), frame(1000, seed=1)
+    current.loc[:299, "v4"] = np.nan
+    current.loc[:299, "v10"] = 0.0
+    current.loc[:49, "v12"] = np.nan
+    assert missing_features(current, reference) == ["v4", "v10"]
+    assert missing_features(current, reference, max_share=0.5) == []
+
+
 def test_out_of_range_share() -> None:
     reference, current = frame(1000), frame(1000, seed=1)
     assert out_of_range_share(current, reference, 0.1) < 0.01
