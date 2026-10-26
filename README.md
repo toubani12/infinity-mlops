@@ -46,3 +46,12 @@ make down      # stop; make reset also deletes the volumes
 ```
 
 Details in [docs/runbooks/local-stack.md](docs/runbooks/local-stack.md). Ports and environment variables: [docs/architecture/runtime-conventions.md](docs/architecture/runtime-conventions.md). Architecture: [docs/architecture/overview.md](docs/architecture/overview.md).
+
+## Kubernetes
+
+```bash
+make minikube       # start minikube, build images inside it, apply k8s/overlays/minikube
+make k8s-validate   # render k8s/base and both overlays
+```
+
+Manifests: `k8s/base` (one folder per workload) with overlays `k8s/overlays/minikube` and `k8s/overlays/ci-kind`. Details in [docs/runbooks/minikube.md](docs/runbooks/minikube.md). Decisions: [docs/adr](docs/adr/README.md).
