@@ -1,0 +1,39 @@
+[project]
+name = "drift-monitor"
+version = "0.1.0"
+description = "Evidently drift report on the prediction log, publishes drift.detected"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "aiokafka>=0.14.0",
+    "boto3>=1.43.118",
+    "evidently==0.7.23",
+    "pandas>=2.2,<3",
+    "pyarrow>=26.0.0",
+    "pydantic-settings>=2.16.1",
+    "scikit-learn>=1.9.1",
+]
+
+[dependency-groups]
+dev = [
+    "jsonschema[format-nongpl]>=4.26.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.2",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--cov=monitor --cov-report=term-missing"
+filterwarnings = ["ignore::SyntaxWarning", "ignore::DeprecationWarning"]
