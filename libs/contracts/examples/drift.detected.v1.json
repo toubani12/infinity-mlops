@@ -1,0 +1,27 @@
+{
+  "report_id": "1c9e6f50-2d7a-4b8e-8f3c-5a6b7c8d9e0f",
+  "detected_at": "2026-10-26T10:00:00Z",
+  "window": {
+    "start": "2026-10-26T09:00:00Z",
+    "end": "2026-10-26T10:00:00Z",
+    "rows": 12000
+  },
+  "drift_share": 0.36,
+  "drifted_features": [
+    "v4",
+    "v10",
+    "v12",
+    "v14",
+    "amount"
+  ],
+  "missing_features": [],
+  "out_of_range_share": 0.0,
+  "metrics": {
+    "pr_auc": 0.71,
+    "reference_pr_auc": 0.84,
+    "recall_at_p90": 0.52,
+    "labeled_rows": 3100
+  },
+  "model_version": "3",
+  "report_uri": "s3://drift-reports/2026/10/26/10/1c9e6f50.html"
+}
