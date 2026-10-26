@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.infinity.core.security.Role;
+import io.infinity.core.security.TokenService;
 import io.infinity.core.transaction.TransactionFixtures;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -31,6 +33,9 @@ class BackendApplicationTest {
     @Autowired
     private ObjectMapper json;
 
+    @Autowired
+    private TokenService tokens;
+
     @Test
     void exposesHealthAndPrometheus() throws Exception {
         mvc.perform(get("/actuator/health")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UP"));
@@ -43,10 +48,20 @@ class BackendApplicationTest {
     void storesAndListsTransaction() throws Exception {
         String body = json.writeValueAsString(Map.of("amount", 12.5, "features", TransactionFixtures.features()));
 
-        mvc.perform(post("/api/transactions").contentType(MediaType.APPLICATION_JSON).content(body))
+        String bearer = "Bearer " + tokens.issue("ana", Role.ANALYST).token();
+
+        mvc.perform(post("/api/transactions").header("Authorization", bearer)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
-        mvc.perform(get("/api/transactions"))
+        mvc.perform(get("/api/transactions").header("Authorization", bearer))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].amount").value(12.5));
+    }
+
+    @Test
+    void doesNotIssueDevTokensOutsideTheLocalProfile() throws Exception {
+        mvc.perform(post("/api/auth/dev-token").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"ana\",\"role\":\"admin\"}"))
+                .andExpect(status().isNotFound());
     }
 }

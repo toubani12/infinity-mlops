@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -29,6 +30,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(TransactionController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class TransactionControllerTest {
 
     private static final UUID ID = UUID.fromString("7f8d4c2e-1b3a-4e5f-9a6b-0c1d2e3f4a5b");
