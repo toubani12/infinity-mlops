@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://infinity-mlops.io/contracts/events/agent.commands.v1.json",
+  "title": "agent.commands.v1",
+  "description": "Human decision on a pending run, published by backend-spring. Key: run_id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "command_id",
+    "timestamp",
+    "action",
+    "actor"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "command_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "approve",
+        "reject"
+      ]
+    },
+    "actor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "if": {
+    "properties": {
+      "action": {
+        "const": "reject"
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "reason": {
+        "type": "string",
+        "minLength": 3
+      }
+    },
+    "required": [
+      "reason"
+    ]
+  }
+}
