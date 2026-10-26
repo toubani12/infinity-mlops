@@ -1,0 +1,15 @@
+* @toubani12
+
+/libs/contracts/ @toubani12 @Agrigah @mustapha005
+/infra/ @toubani12 @Agrigah
+/k8s/ @toubani12 @Agrigah
+/.github/ @toubani12 @mustapha005
+/.githooks/ @toubani12 @mustapha005
+/services/agents-langgraph/ @toubani12 @Agrigah
+/docs/ @toubani12 @Agrigah @mustapha005
+/pipelines/ @toubani12 @Agrigah
+/apps/fastapi-ml/ @toubani12 @Agrigah
+/services/drift-monitor/ @toubani12 @Agrigah
+/k8s/jobs/ @toubani12 @Agrigah
+/apps/backend-spring/ @toubani12 @mustapha005
+/apps/frontend-next/ @toubani12 @mustapha005
