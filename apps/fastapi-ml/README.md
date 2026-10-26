@@ -9,7 +9,7 @@ It implements `libs/contracts/openapi/inference.v1.yaml`.
 | GET | `/model` | name, version, alias, load time and threshold of the served model |
 | POST | `/model/reload` | load the version behind the alias and swap it in; 503 keeps the previous model |
 | GET | `/health` | `ok` with a model, `degraded` without |
-| GET | `/metrics` | Prometheus: `http_request_duration_seconds`, `predictions_total`, `fraud_score`, `model_reloads_total`, `kafka_messages_total`, `kafka_batch_size` |
+| GET | `/metrics` | Prometheus: `http_request_duration_seconds`, `predictions_total`, `fraud_score`, `model_reloads_total`, `kafka_messages_total`, `kafka_batch_size`, `prediction_log_rows_total` |
 
 The model is loaded at startup (FastAPI lifespan). If the registry is unreachable the service
 still starts, answers 503 and retries every `MODEL_RETRY_SECONDS` until a load succeeds. A reload loads the new version next to the
@@ -28,6 +28,19 @@ retried. Messages that are not valid JSON or break the v1 schema are logged, cou
 `kafka_messages_total{result="invalid"}` and skipped. No message is consumed while no model is
 loaded. Shutdown finishes the current batch, commits, then stops the clients.
 
+## Prediction log
+
+Every score, from `/predict` or Kafka, is buffered and written as parquet to
+`predictions/dt=YYYY-MM-DD/hour=HH/part-<uuid>.parquet` when the buffer holds
+`PREDICTION_LOG_MAX_ROWS` rows or its oldest row is `PREDICTION_LOG_MAX_SECONDS` old, and once
+more at shutdown. Partitions follow the scoring time, so replayed transactions land in the window
+drift-monitor reads. Columns: `transaction_id`, `timestamp` (transaction time, UTC), `v1`..`v28`,
+`amount`, `fraud_score`, `is_fraud`, `model_version`, `latency_ms`, `label` (nullable, filled only
+when `transaction.raw` carries one). A failed write keeps the rows for the next flush; the buffer
+is capped at 50 000 rows (`prediction_log_rows_total{result="dropped"}` counts the overflow).
+The writer sits behind a `PredictionStore` interface with an S3 (boto3, MinIO) and a local
+filesystem implementation.
+
 ## Configuration
 
 | Variable | Default |
@@ -37,6 +50,10 @@ loaded. Shutdown finishes the current batch, commits, then stops the clients.
 | `MODEL_ALIAS` | `champion` |
 | `FRAUD_THRESHOLD` | `0.5` |
 | `MODEL_RETRY_SECONDS` | `15` |
+| `PREDICTION_LOG_ENABLED` | `true` |
+| `PREDICTION_LOG_URI` | `s3://predictions` (a local directory works too) |
+| `PREDICTION_LOG_MAX_ROWS` / `PREDICTION_LOG_MAX_SECONDS` | `1000` / `60` |
+| `S3_ENDPOINT_URL` | unset; `http://minio:9000` in compose, with `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` |
 | `KAFKA_ENABLED` | `false` |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` |
 | `KAFKA_INPUT_TOPIC` / `KAFKA_OUTPUT_TOPIC` | `transaction.raw` / `transaction.scored` |

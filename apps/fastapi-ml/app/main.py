@@ -12,6 +12,7 @@ from app.api.routes import router
 from app.core.config import Settings, get_settings
 from app.core.metrics import REQUEST_LATENCY
 from app.inference.model import MlflowModelLoader, ModelLoader
+from app.inference.prediction_log import PredictionLogWriter, store_from_uri
 from app.inference.service import InferenceService, ModelUnavailableError
 from app.messaging.consumer import KafkaScoring
 
@@ -41,32 +42,52 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if app.state.settings.kafka_enabled
         else None
     )
+    writer: PredictionLogWriter | None = app.state.prediction_log
+    flusher = asyncio.create_task(writer.run()) if writer else None
     if kafka:
         await kafka.start()
     yield
     if kafka:
         await kafka.stop()
+    if flusher and writer:
+        flusher.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await flusher
+        await asyncio.to_thread(writer.flush)
     if retry:
         retry.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await retry
 
 
+def build_prediction_log(settings: Settings) -> PredictionLogWriter | None:
+    if not settings.prediction_log_enabled:
+        return None
+    return PredictionLogWriter(
+        store_from_uri(settings.prediction_log_uri, settings.s3_endpoint_url),
+        max_rows=settings.prediction_log_max_rows,
+        max_seconds=settings.prediction_log_max_seconds,
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     loader: ModelLoader | None = None,
     kafka_factory: Callable[[Settings, InferenceService], Any] = KafkaScoring,
+    prediction_log: PredictionLogWriter | None = None,
 ) -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     settings = settings or get_settings()
     app = FastAPI(title="fastapi-ml inference", version="1.0.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.kafka_factory = kafka_factory
+    app.state.prediction_log = prediction_log or build_prediction_log(settings)
     app.state.service = InferenceService(
         loader or MlflowModelLoader(settings.mlflow_tracking_uri),
         settings.model_name,
         settings.model_alias,
         settings.fraud_threshold,
+        sink=app.state.prediction_log.add if app.state.prediction_log else None,
     )
     app.include_router(router)
 

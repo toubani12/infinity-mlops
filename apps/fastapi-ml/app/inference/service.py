@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -37,8 +38,16 @@ class Score:
 
 
 class InferenceService:
-    def __init__(self, loader: ModelLoader, name: str, alias: str, threshold: float) -> None:
+    def __init__(
+        self,
+        loader: ModelLoader,
+        name: str,
+        alias: str,
+        threshold: float,
+        sink: Callable[[list["Transaction"], list["Score"]], None] | None = None,
+    ) -> None:
         self._loader = loader
+        self._sink = sink
         self._name = name
         self._alias = alias
         self.threshold = threshold
@@ -97,4 +106,6 @@ class InferenceService:
                     latency_ms=latency_ms,
                 )
             )
+        if self._sink:
+            self._sink(transactions, results)
         return results

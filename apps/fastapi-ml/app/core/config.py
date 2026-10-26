@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     fraud_threshold: float = Field(default=0.5, ge=0, le=1)
     model_retry_seconds: float = Field(default=15.0, gt=0)
 
+    prediction_log_enabled: bool = True
+    prediction_log_uri: str = "s3://predictions"
+    prediction_log_max_rows: int = Field(default=1000, ge=1)
+    prediction_log_max_seconds: float = Field(default=60.0, gt=0)
+    s3_endpoint_url: str | None = None
+
     kafka_enabled: bool = False
     kafka_bootstrap_servers: str = "localhost:9092"
     kafka_group_id: str = "fastapi-ml"
