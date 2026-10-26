@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-next
+  labels:
+    app.kubernetes.io/name: frontend-next
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend-next
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: frontend-next
+    spec:
+      containers:
+        - name: frontend-next
+          image: ghcr.io/toubani12/infinity-mlops/frontend-next:latest
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_BASE_URL
+              value: http://localhost:8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
