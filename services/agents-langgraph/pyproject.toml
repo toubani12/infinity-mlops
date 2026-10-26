@@ -1,0 +1,40 @@
+[project]
+name = "agents-langgraph"
+version = "0.1.0"
+description = "Self-healing agent: qualifies drift alerts, retrains, gates and promotes the fraud model"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiokafka>=0.14.0",
+    "fastapi>=0.162.0",
+    "httpx>=0.28.1",
+    "langgraph==1.2.17",
+    "prometheus-client>=0.26.0",
+    "pydantic-settings>=2.16.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "jsonschema[format]>=4.26.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.2",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--cov=agent --cov-report=term-missing"
