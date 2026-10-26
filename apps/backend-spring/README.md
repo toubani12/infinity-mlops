@@ -17,6 +17,9 @@ Spring Boot 3.5, Java 21, PostgreSQL with Flyway, Actuator with Prometheus metri
 | GET | `/api/models/versions?page&size` | champion alias moves from `model.promoted`, newest first |
 | GET | `/api/stream/transactions` | SSE, event `transaction` (same JSON as the REST transaction) after each score |
 | GET | `/api/stream/alerts` | SSE, event `alert` when an alert opens or changes status |
+| GET | `/api/agent/runs?page&size&status` | agent runs, newest first |
+| GET | `/api/agent/runs/{runId}` | `{ run, champion, challenger, gate, events }` |
+| GET | `/api/stream/agent` | SSE, event `agent` with `{ run, event }` on each step |
 | GET | `/actuator/health`, `/actuator/prometheus` | |
 
 REST bodies use camelCase. Kafka payloads follow `libs/contracts` (snake_case). Lists return `{ content, page, size, totalElements, totalPages }`. Errors are RFC 9457 problem details (`application/problem+json`); validation errors add an `errors` map keyed by field.
@@ -53,6 +56,23 @@ The service also consumes `drift.detected` into `drift_report` and `model.promot
 
 It consumes `transaction.scored` in group `backend-spring`. Each record updates the transaction's score fields and opens an alert when `fraud_score >= ALERT_THRESHOLD`. Replays are harmless: the score is overwritten with the same values and `alerts.transaction_id` is unique, checked before insert. Scores for unknown transactions are logged and counted (`infinity_scores_unknown_transaction_total`), so transactions must enter through `POST /api/transactions` to appear in the dashboard. Unreadable or incomplete records are skipped at once; other failures are retried three times one second apart, then logged and skipped.
 
+## Agent runs
+
+`agent.events` is consumed into `agent_run` (one row per run) and `agent_run_event` (the timeline, ordered by arrival through `seq`), idempotent on `event_id`. The run status follows the steps listed in `services/agents-langgraph/README.md`:
+
+| Status | Set by |
+|---|---|
+| `RUNNING` | first event, and `approved` while the promotion runs |
+| `AWAITING_APPROVAL` | `approval_requested` |
+| `PROMOTED` | `promoted` or `completed` (promote) |
+| `REJECTED` | `rejected` |
+| `KEPT_CHAMPION` | `completed` (keep_champion) after a failed gate |
+| `ESCALATED` | `escalated` or `completed` (data_incident) |
+| `FAILED` | `failed` |
+| `NOISE` | `completed` (noise) |
+
+A final status never changes, so the `completed` that follows `rejected` and a `received` for an alert attached to the run leave it as is. Champion and challenger metrics come from the `evaluated` and `approval_requested` payloads, the gate result and reasons from `evaluated`; the detail also returns `gate.maxP95LatencyMs` (`MAX_P95_LATENCY_MS`, same default as the agent).
+
 ## Configuration
 
 | Variable | Default |
@@ -61,6 +81,7 @@ It consumes `transaction.scored` in group `backend-spring`. Each record updates 
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `infinity` / `infinity` |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` |
 | `ALERT_THRESHOLD` | `0.5` |
+| `MAX_P95_LATENCY_MS` | `50` |
 | `JWT_SECRET` | none, required |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` |
 | `SPRING_PROFILES_ACTIVE` | set `local` to enable the dev token endpoint |

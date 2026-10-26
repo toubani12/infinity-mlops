@@ -1,6 +1,7 @@
 package io.infinity.core.stream;
 
 import io.infinity.core.alert.AlertChangedEvent;
+import io.infinity.core.modelops.AgentRunChangedEvent;
 import io.infinity.core.transaction.TransactionScoredEvent;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -23,5 +24,11 @@ public class StreamPublisher {
     @TransactionalEventListener(fallbackExecution = true)
     public void onAlertChanged(AlertChangedEvent event) {
         broadcaster.publish(StreamChannel.ALERTS, "alert", event.alert().id().toString(), event.alert());
+    }
+
+    @TransactionalEventListener(fallbackExecution = true)
+    public void onAgentRunChanged(AgentRunChangedEvent event) {
+        String id = event.event() == null ? event.run().runId().toString() : event.event().eventId().toString();
+        broadcaster.publish(StreamChannel.AGENT, "agent", id, event);
     }
 }
