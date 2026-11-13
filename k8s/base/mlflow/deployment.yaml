@@ -14,6 +14,9 @@ spec:
       labels:
         app.kubernetes.io/name: mlflow
     spec:
+      # The Service named mlflow injects MLFLOW_PORT=tcp://<ip>:5000, which the mlflow CLI reads
+      # as the --port default and rejects as not an integer.
+      enableServiceLinks: false
       containers:
         - name: mlflow
           image: ghcr.io/toubani12/infinity-mlops/mlflow:latest
