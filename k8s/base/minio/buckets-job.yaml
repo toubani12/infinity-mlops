@@ -12,6 +12,7 @@ spec:
       labels:
         app.kubernetes.io/name: minio-buckets
     spec:
+      enableServiceLinks: false
       restartPolicy: OnFailure
       containers:
         - name: create-buckets

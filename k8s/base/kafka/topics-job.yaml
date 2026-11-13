@@ -12,6 +12,7 @@ spec:
       labels:
         app.kubernetes.io/name: kafka-topics
     spec:
+      enableServiceLinks: false
       restartPolicy: OnFailure
       containers:
         - name: create-topics

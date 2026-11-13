@@ -15,6 +15,9 @@ spec:
       labels:
         app.kubernetes.io/name: kafka
     spec:
+      # The image turns every KAFKA_* variable into a broker property, so the Service named kafka
+      # would add port=tcp://<ip>:9092, service.host and others to server.properties.
+      enableServiceLinks: false
       securityContext:
         fsGroup: 1000
       containers:

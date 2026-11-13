@@ -17,6 +17,7 @@ spec:
       labels:
         app.kubernetes.io/name: agents-langgraph
     spec:
+      enableServiceLinks: false
       serviceAccountName: agents-langgraph
       containers:
         - name: agents-langgraph

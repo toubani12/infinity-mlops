@@ -14,6 +14,7 @@ spec:
       labels:
         app.kubernetes.io/name: backend-spring
     spec:
+      enableServiceLinks: false
       containers:
         - name: backend-spring
           image: ghcr.io/toubani12/infinity-mlops/backend-spring:latest

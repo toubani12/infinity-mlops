@@ -14,6 +14,7 @@ spec:
       labels:
         app.kubernetes.io/name: frontend-next
     spec:
+      enableServiceLinks: false
       containers:
         - name: frontend-next
           image: ghcr.io/toubani12/infinity-mlops/frontend-next:latest
