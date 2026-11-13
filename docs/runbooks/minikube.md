@@ -87,4 +87,5 @@ minikube -p infinity delete           # removes the whole cluster
 
 - `ImagePullBackOff` on a service: its folder has no Dockerfile yet, or the build failed. Rerun `make minikube` once it exists.
 - `kafka-topics` or `minio-buckets` Job retrying: the broker or MinIO is not ready yet; the Jobs retry up to 20 times.
+- A pod fails on a value like `tcp://10.96.x.x:5000` in a `<SERVICE>_PORT` variable: its template lacks `enableServiceLinks: false`. Every workload sets it, because the injected Service variables collide with `MLFLOW_PORT` and the `KAFKA_*` broker settings; reach other services by DNS name.
 - Pods `Pending` with insufficient memory: raise `MINIKUBE_MEMORY` and recreate the cluster (`minikube -p infinity delete`), memory cannot change on a running profile.
