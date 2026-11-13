@@ -9,9 +9,12 @@ RUN pip install --no-cache-dir \
 USER mlflow
 WORKDIR /home/mlflow
 
+# Server jobs only back GenAI features (online scoring, trace archival) this platform does not use;
+# their seven huey consumers take about 200 MB each and get the pod OOM-killed under 1 GiB.
 ENV MLFLOW_HOST=0.0.0.0 \
     MLFLOW_PORT=5000 \
     MLFLOW_SERVE_ARTIFACTS=true \
+    MLFLOW_SERVER_ENABLE_JOB_EXECUTION=false \
     PYTHONUNBUFFERED=1
 
 EXPOSE 5000
